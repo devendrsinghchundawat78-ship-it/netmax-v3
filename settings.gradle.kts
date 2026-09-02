@@ -1,4 +1,4 @@
-rootProject.name = "NetMax"
+rootProject.name = "nuvio"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {

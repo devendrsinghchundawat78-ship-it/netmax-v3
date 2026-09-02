@@ -201,6 +201,11 @@ plugins {
     alias(libs.plugins.kotlinxSerialization)
 }
 
+compose.resources {
+    packageOfResClass = "nuvio.composeapp.generated.resources"
+    publicResClass = true
+}
+
 val supabaseProps = Properties().apply {
     val propsFile = rootProject.file("local.properties")
     if (propsFile.exists()) propsFile.inputStream().use { load(it) }
