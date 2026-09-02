@@ -35,8 +35,8 @@ actual object ThemeSettingsStorage {
     actual fun loadThemeMode(): String? =
         NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(themeModeKey))
 
-    actual fun saveThemeMode(modeKeyValue: String) {
-        NSUserDefaults.standardUserDefaults.setObject(modeKeyValue, forKey = ProfileScopedKey.of(themeModeKey))
+    actual fun saveThemeMode(modeKey: String) {
+        NSUserDefaults.standardUserDefaults.setObject(modeKey, forKey = ProfileScopedKey.of(themeModeKey))
     }
 
     actual fun loadAmoledEnabled(): Boolean? {

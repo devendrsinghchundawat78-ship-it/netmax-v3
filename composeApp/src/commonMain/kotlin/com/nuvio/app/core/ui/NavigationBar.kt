@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -142,7 +143,7 @@ fun NuvioNavigationBar(
     ) {
         // The floating pill
         val glassShape = RoundedCornerShape(NuvioTokens.Radius.full)
-        val isLight = MaterialTheme.colorScheme.isLight
+        val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
         val glassTint = if (isLight) Color.White.copy(alpha = 0.72f) else Color(0xFF1C1C1E).copy(alpha = 0.55f)
         val glassBorder = if (isLight) Color.White.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.16f)
         val pillModifier = Modifier

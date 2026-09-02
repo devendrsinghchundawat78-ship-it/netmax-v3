@@ -49,10 +49,10 @@ actual object ThemeSettingsStorage {
     actual fun loadThemeMode(): String? =
         preferences?.getString(ProfileScopedKey.of(themeModeKey), null)
 
-    actual fun saveThemeMode(modeKeyValue: String) {
+    actual fun saveThemeMode(modeKey: String) {
         preferences
             ?.edit()
-            ?.putString(ProfileScopedKey.of(themeModeKey), modeKeyValue)
+            ?.putString(ProfileScopedKey.of(themeModeKey), modeKey)
             ?.apply()
     }
 

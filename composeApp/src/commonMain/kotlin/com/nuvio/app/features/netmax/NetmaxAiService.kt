@@ -2,6 +2,7 @@ package com.nuvio.app.features.netmax
 
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.functions.functions
+import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -105,6 +106,7 @@ object NetmaxAiService {
 @kotlinx.serialization.Serializable
 data class AiHistoryMessage(val role: String, val content: String, val created_at: String? = null, val image_meta: kotlinx.serialization.json.JsonElement? = null)
 
+data class AiHistoryResult(val conversationId: String?, val messages: List<AiHistoryMessage>, val usage: AiUsage)
 data class AiUsage(val used: Int, val limit: Int, val remaining: Int)
 data class AiPendingAction(val type: String, val title: String, val description: String, val movieName: String? = null, val year: Int? = null, val tmdbId: Int? = null, val category: String? = null)
 data class AiChatResult(val conversationId: String?, val reply: String, val pendingAction: AiPendingAction?, val usage: AiUsage)

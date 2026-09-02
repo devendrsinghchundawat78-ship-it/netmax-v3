@@ -11,6 +11,7 @@ import com.nuvio.app.core.ui.appTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.jetbrains.compose.resources.painterResource
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.*
 
 @Composable
 internal fun AppBrandWordmark(
