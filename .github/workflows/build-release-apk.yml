@@ -1,0 +1,119 @@
+name: Build Android Release APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release-apk:
+    name: Build Release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Prepare Keystore and Build Configuration
+        run: |
+          echo "=== Generating Release Signing Keystore ==="
+          if [ -n "${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > release.jks
+            echo "Using keystore from secret"
+          else
+            keytool -genkey -v \
+              -keystore release.jks \
+              -alias netmax \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass netmaxpassword \
+              -keypass netmaxpassword \
+              -dname "CN=NetMax Release, OU=NetMax, O=NetMax, L=Unknown, ST=Unknown, C=IN"
+            echo "Generated self-signed release keystore"
+          fi
+
+          echo "=== Setting up local.properties ==="
+          if [ -n "${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}" ]; then
+            echo "${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}" | base64 --decode > local.properties
+            echo "NUVIO_RELEASE_STORE_FILE=release.jks" >> local.properties
+          else
+            cat << 'EOF' > local.properties
+          NUVIO_RELEASE_STORE_FILE=release.jks
+          NUVIO_RELEASE_STORE_PASSWORD=netmaxpassword
+          NUVIO_RELEASE_KEY_ALIAS=netmax
+          NUVIO_RELEASE_KEY_PASSWORD=netmaxpassword
+          TRAKT_CLIENT_ID=
+          TRAKT_CLIENT_SECRET=
+          TRAKT_REDIRECT_URI=nuvio://auth/trakt
+          SIMKL_CLIENT_ID=
+          SIMKL_REDIRECT_URI=nuvio://auth/simkl
+          SIMKL_APP_NAME=netmax
+          EOF
+          fi
+
+      - name: Build Android Full Release APK
+        run: |
+          echo "=== Building Release APK with Gradle ==="
+          ./gradlew :androidApp:assembleFullRelease --stacktrace --no-daemon
+
+      - name: Verify Release APK Output
+        id: apk-check
+        run: |
+          echo "=== Checking Generated Release APKs ==="
+          ls -la androidApp/build/outputs/apk/full/release/
+          
+          # Count APKs
+          APK_COUNT=$(find androidApp/build/outputs/apk/full/release/ -name "*.apk" | wc -l)
+          echo "Found $APK_COUNT APK(s)"
+          if [ "$APK_COUNT" -eq 0 ]; then
+            echo "Error: No release APK found!" >&2
+            exit 1
+          fi
+
+      - name: Upload Release APK Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetMax-Release-APKs
+          path: androidApp/build/outputs/apk/full/release/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release with APKs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(grep "MARKETING_VERSION" iosApp/Configuration/Version.xcconfig | cut -d'=' -f2 | tr -d ' ' || echo "1.0.0")
+          TAG_NAME="v${VERSION}-${{ github.run_number }}"
+          RELEASE_TITLE="NetMax Release v${VERSION} (Build ${{ github.run_number }})"
+          
+          echo "Creating Release $TAG_NAME - $RELEASE_TITLE"
+          
+          gh release create "$TAG_NAME" \
+            androidApp/build/outputs/apk/full/release/*.apk \
+            --title "$RELEASE_TITLE" \
+            --notes "### NetMax Android Release Build
+          
+          **Version:** ${VERSION}
+          **Build Number:** ${{ github.run_number }}
+          **Commit:** ${{ github.sha }}
+          
+          #### Release APKs:
+          - **Universal APK:** Installs on all Android devices
+          - **Architecture-specific APKs:** Optimized for specific CPU architectures (arm64-v8a, armeabi-v7a, x86_64, x86)" \
+            --generate-notes=false || true
