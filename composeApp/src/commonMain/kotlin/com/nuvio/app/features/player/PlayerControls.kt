@@ -33,15 +33,19 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Replay10
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
+import com.nuvio.app.core.ui.LiquidGlassDefaults
+import com.nuvio.app.features.settings.LiquidGlassSettingsRepository
+import com.nuvio.app.features.settings.ThemeSettingsRepository
+import com.nuvio.app.core.ui.liquidGlass
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SliderState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +67,8 @@ import com.nuvio.app.core.ui.appIconPainter
 import com.nuvio.app.core.ui.gradientMask
 import com.nuvio.app.core.ui.nuvioTypeScale
 import nuvio.composeapp.generated.resources.*
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -101,7 +107,18 @@ internal fun PlayerControlsShell(
     horizontalSafePadding: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
+    val hazeState = rememberHazeState()
+    LiquidGlassSettingsRepository.ensureLoaded()
+    val glassSettings by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
+    val masterGlassEnabled by ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.collectAsStateWithLifecycle()
+    val glassSourceModifier = if (glassSettings.enabled && masterGlassEnabled) {
+        Modifier.hazeSource(state = hazeState)
+    } else Modifier
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .then(glassSourceModifier),
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -155,6 +172,7 @@ internal fun PlayerControlsShell(
                 onVideoSettingsClick = onVideoSettingsClick,
                 onOpenInExternalPlayer = onOpenInExternalPlayer,
                 onBack = onBack,
+                hazeState = hazeState,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .fillMaxWidth()
@@ -173,6 +191,7 @@ internal fun PlayerControlsShell(
                     onSeekBack = onSeekBack,
                     onSeekForward = onSeekForward,
                     onTogglePlayback = onTogglePlayback,
+                    hazeState = hazeState,
                     modifier = Modifier
                         .align(Alignment.Center)
                         .padding(bottom = metrics.centerLift),
@@ -193,6 +212,7 @@ internal fun PlayerControlsShell(
                     onAudioClick = onAudioClick,
                     onSourcesClick = onSourcesClick,
                     onEpisodesClick = onEpisodesClick,
+                    hazeState = hazeState,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
@@ -223,6 +243,7 @@ private fun PlayerHeader(
     onVideoSettingsClick: (() -> Unit)?,
     onOpenInExternalPlayer: (() -> Unit)?,
     onBack: () -> Unit,
+    hazeState: dev.chrisbanes.haze.HazeState? = null,
     modifier: Modifier = Modifier,
 ) {
     val typeScale = MaterialTheme.nuvioTypeScale
@@ -308,10 +329,19 @@ private fun PlayerHeader(
             }
 
             if (showActions) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                Box(
+                    modifier = Modifier
+                        .liquidGlass(
+                            shape = LiquidGlassDefaults.PillShape,
+                            hazeState = hazeState,
+                            borderWidth = 1.dp,
+                        )
+                        .padding(horizontal = 6.dp, vertical = 5.dp),
                 ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                     if (onSubmitIntroClick != null) {
                         PlayerHeaderIconButton(
                             icon = Icons.Rounded.Flag,
@@ -352,12 +382,13 @@ private fun PlayerHeader(
                     }
                     NuvioBackButton(
                         onClick = onBack,
-                        containerColor = Color.Black.copy(alpha = 0.35f),
+                        containerColor = Color.Transparent,
                         contentColor = Color.White,
                         buttonSize = metrics.headerIconSize + 16.dp,
                         iconSize = metrics.headerIconSize,
                         contentDescription = stringResource(Res.string.compose_player_close),
                     )
+                    }
                 }
             }
         }
@@ -396,10 +427,19 @@ private fun CenterControls(
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
     onTogglePlayback: () -> Unit,
+    hazeState: dev.chrisbanes.haze.HazeState? = null,
     modifier: Modifier = Modifier,
 ) {
+    Box(
+        modifier = modifier
+            .liquidGlass(
+                shape = LiquidGlassDefaults.PillShape,
+                hazeState = hazeState,
+                borderWidth = 1.dp,
+            )
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+    ) {
     Row(
-        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(metrics.centerGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -421,6 +461,7 @@ private fun CenterControls(
             metrics = metrics,
             onClick = onSeekForward,
         )
+    }
     }
 }
 
@@ -499,6 +540,7 @@ private fun ProgressControls(
     onAudioClick: () -> Unit,
     onSourcesClick: (() -> Unit)? = null,
     onEpisodesClick: (() -> Unit)? = null,
+    hazeState: dev.chrisbanes.haze.HazeState? = null,
     modifier: Modifier = Modifier,
 ) {
     val durationMs = playbackSnapshot.durationMs.coerceAtLeast(1L)
@@ -535,14 +577,14 @@ private fun ProgressControls(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
         ) {
-            Surface(
-                color = Color.Black.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.border(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(24.dp),
-                ),
+            Box(
+                modifier = Modifier
+                    .liquidGlass(
+                        shape = RoundedCornerShape(24.dp),
+                        hazeState = hazeState,
+                        borderWidth = 1.dp,
+                    )
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
@@ -746,6 +788,8 @@ private fun PlayerActionPillButton(
     icon: ImageVector? = null,
     painter: Painter? = null,
 ) {
+    LiquidGlassSettingsRepository.ensureLoaded()
+    val glassTextColor by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(22.dp))
@@ -758,21 +802,21 @@ private fun PlayerActionPillButton(
             painter != null -> Icon(
                 painter = painter,
                 contentDescription = label,
-                tint = Color.White,
+                tint = glassTextColor.textColor,
                 modifier = Modifier.size(18.dp),
             )
 
             icon != null -> Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = Color.White,
+                tint = glassTextColor.textColor,
                 modifier = Modifier.size(18.dp),
             )
         }
         Text(
             text = label,
             style = MaterialTheme.nuvioTypeScale.labelSm,
-            color = Color.White,
+            color = glassTextColor.textColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             softWrap = false,

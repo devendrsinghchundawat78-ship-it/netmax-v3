@@ -226,6 +226,40 @@ internal fun PlayerScreenRuntime.switchToP2pEpisodeStream(
     applyEpisodeStreamMetadata(stream, episode, resume)
 }
 
+
+internal fun PlayerScreenRuntime.tryAutomaticSourceFailover(): Boolean {
+    val failedIdentity = activeSourceIdentityKey
+        ?: activeSourceUrl.trim().takeIf { it.isNotBlank() }?.let { "url:$it" }
+        ?: return false
+
+    if (!automaticSourceFailoverAttempts.add(failedIdentity)) return false
+
+    val candidates = PlayerStreamsRepository.sourceState.value.groups
+        .flatMap { it.streams }
+        .filter { stream ->
+            stream.playerSourceIdentityKey() != failedIdentity &&
+                stream.playableDirectUrl != null
+        }
+        .distinctBy { it.playerSourceIdentityKey() }
+
+    if (candidates.isEmpty()) return false
+
+    // Prefer sources that have explicit media URLs and useful request headers.
+    // Keep this lightweight: the provider order remains untouched.
+    val candidate = candidates.maxByOrNull { stream ->
+        var score = 0
+        val url = stream.playableDirectUrl.orEmpty().lowercase()
+        if (stream.behaviorHints.proxyHeaders?.request?.isNotEmpty() == true) score += 2
+        if (url.substringBefore('?').endsWith(".m3u8")) score += 2
+        if (url.substringBefore('?').endsWith(".mp4")) score += 1
+        if (!stream.behaviorHints.filename.isNullOrBlank()) score += 1
+        score
+    } ?: return false
+
+    switchToSource(candidate)
+    return true
+}
+
 internal fun PlayerScreenRuntime.switchToSource(stream: StreamItem) {
     if (
         resolveDebridForPlayer(

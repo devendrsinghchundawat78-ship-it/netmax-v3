@@ -16,6 +16,26 @@ internal expect object ThemeSettingsStorage {
     fun applySelectedAppLanguage(languageCode: String)
     fun loadNavBarStyle(): String?
     fun saveNavBarStyle(styleKey: String)
+    fun loadLiquidGlassEnabled(): Boolean?
+    fun saveLiquidGlassEnabled(enabled: Boolean)
+    fun loadLiquidGlassVibrancy(): Float?
+    fun saveLiquidGlassVibrancy(value: Float)
+    fun loadLiquidGlassBlurRadius(): Float?
+    fun saveLiquidGlassBlurRadius(value: Float)
+    fun loadLiquidGlassRefractionHeight(): Float?
+    fun saveLiquidGlassRefractionHeight(value: Float)
+    fun loadLiquidGlassRefractionAmount(): Float?
+    fun saveLiquidGlassRefractionAmount(value: Float)
+    fun loadLiquidGlassChromaticAberration(): Float?
+    fun saveLiquidGlassChromaticAberration(value: Float)
+    fun loadLiquidGlassDepthEffect(): Float?
+    fun saveLiquidGlassDepthEffect(value: Float)
+    fun loadLiquidGlassSurfaceTint(): String?
+    fun saveLiquidGlassSurfaceTint(value: String)
+    fun loadLiquidGlassSurfaceOpacity(): Float?
+    fun saveLiquidGlassSurfaceOpacity(value: Float)
+    fun loadLiquidGlassTextColor(): String?
+    fun saveLiquidGlassTextColor(value: String)
     fun exportToSyncPayload(): JsonObject
     fun replaceFromSyncPayload(payload: JsonObject)
 }

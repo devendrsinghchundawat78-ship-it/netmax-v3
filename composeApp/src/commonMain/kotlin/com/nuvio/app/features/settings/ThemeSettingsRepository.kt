@@ -45,6 +45,7 @@ object ThemeSettingsRepository {
 
     fun onProfileChanged() {
         loadFromDisk()
+        LiquidGlassSettingsRepository.onProfileChanged()
     }
 
     fun clearLocalState() {
@@ -58,6 +59,7 @@ object ThemeSettingsRepository {
         NativeTabBridge.publishLiquidGlassEnabled(false)
         _selectedAppLanguage.value = AppLanguage.DEVICE
         _navBarStyle.value = NavBarStyle.ADAPTIVE
+        LiquidGlassSettingsRepository.clearLocalState()
     }
 
     private fun loadFromDisk() {

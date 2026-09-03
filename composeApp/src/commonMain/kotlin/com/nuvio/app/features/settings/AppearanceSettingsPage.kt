@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -167,6 +168,7 @@ internal fun LazyListScope.appearanceSettingsContent(
     item {
         var showLanguageSheet by remember { mutableStateOf(false) }
         var showNavBarStyleSheet by remember { mutableStateOf(false) }
+        var showLiquidGlassSheet by remember { mutableStateOf(false) }
         var showAppIconPicker by remember { mutableStateOf(false) }
         SettingsSection(
             title = stringResource(Res.string.settings_appearance_section_display),
@@ -195,7 +197,17 @@ internal fun LazyListScope.appearanceSettingsContent(
                     description = stringResource(Res.string.settings_appearance_liquid_glass_description),
                     checked = liquidGlassNativeTabBarEnabled,
                     isTablet = isTablet,
-                    onCheckedChange = onLiquidGlassNativeTabBarToggle,
+                    onCheckedChange = { enabled ->
+                        onLiquidGlassNativeTabBarToggle(enabled)
+                        LiquidGlassSettingsRepository.setEnabled(enabled)
+                    },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.settings_appearance_liquid_glass_controls),
+                    description = stringResource(Res.string.settings_appearance_liquid_glass_controls_description),
+                    isTablet = isTablet,
+                    onClick = { showLiquidGlassSheet = true },
                 )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
@@ -232,6 +244,13 @@ internal fun LazyListScope.appearanceSettingsContent(
                     )
                 }
             }
+        }
+
+        if (showLiquidGlassSheet) {
+            LiquidGlassControlsBottomSheet(
+                isTablet = isTablet,
+                onDismiss = { showLiquidGlassSheet = false },
+            )
         }
 
         if (showLanguageSheet) {
@@ -488,6 +507,198 @@ private fun ThemeChip(
     }
 }
 
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LiquidGlassControlsBottomSheet(
+    isTablet: Boolean,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val coroutineScope = rememberCoroutineScope()
+    LiquidGlassSettingsRepository.ensureLoaded()
+    val state by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
+
+    NuvioModalBottomSheet(
+        onDismissRequest = {
+            coroutineScope.launch {
+                dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+            }
+        },
+        sheetState = sheetState,
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+        ) {
+            item {
+                Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
+                    Text(
+                        text = stringResource(Res.string.settings_appearance_liquid_glass_controls),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(Res.string.settings_appearance_liquid_glass_controls_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            item {
+                GlassSlider(
+                    title = stringResource(Res.string.settings_appearance_liquid_glass_vibrancy),
+                    valueLabel = "${state.vibrancy.formatOne()}x",
+                    value = state.vibrancy,
+                    range = 0f..2f,
+                    onValueChange = LiquidGlassSettingsRepository::setVibrancy,
+                )
+            }
+            item {
+                GlassSlider(
+                    title = stringResource(Res.string.settings_appearance_liquid_glass_blur_radius),
+                    valueLabel = "${state.blurRadius.toInt()} dp",
+                    value = state.blurRadius,
+                    range = 0f..48f,
+                    onValueChange = LiquidGlassSettingsRepository::setBlurRadius,
+                )
+            }
+            item {
+                GlassSlider(
+                    title = stringResource(Res.string.settings_appearance_liquid_glass_refraction_height),
+                    valueLabel = "${(state.refractionHeight * 100).toInt()}%",
+                    value = state.refractionHeight,
+                    range = 0f..1f,
+                    onValueChange = LiquidGlassSettingsRepository::setRefractionHeight,
+                )
+            }
+            item {
+                GlassSlider(
+                    title = stringResource(Res.string.settings_appearance_liquid_glass_refraction_amount),
+                    valueLabel = "${(state.refractionAmount * 100).toInt()}%",
+                    value = state.refractionAmount,
+                    range = 0f..1f,
+                    onValueChange = LiquidGlassSettingsRepository::setRefractionAmount,
+                )
+            }
+            item {
+                GlassSlider(
+                    title = stringResource(Res.string.settings_appearance_liquid_glass_chromatic_aberration),
+                    valueLabel = "${(state.chromaticAberration * 100).toInt()}%",
+                    value = state.chromaticAberration,
+                    range = 0f..1f,
+                    onValueChange = LiquidGlassSettingsRepository::setChromaticAberration,
+                )
+            }
+            item {
+                GlassSlider(
+                    title = stringResource(Res.string.settings_appearance_liquid_glass_depth_effect),
+                    valueLabel = "${(state.depthEffect * 100).toInt()}%",
+                    value = state.depthEffect,
+                    range = 0f..1f,
+                    onValueChange = LiquidGlassSettingsRepository::setDepthEffect,
+                )
+            }
+            item {
+                GlassSlider(
+                    title = stringResource(Res.string.settings_appearance_liquid_glass_surface_opacity),
+                    valueLabel = "${(state.surfaceOpacity * 100).toInt()}%",
+                    value = state.surfaceOpacity,
+                    range = 0f..0.5f,
+                    onValueChange = LiquidGlassSettingsRepository::setSurfaceOpacity,
+                )
+            }
+            item {
+                GlassColorPresets(
+                    title = stringResource(Res.string.settings_appearance_liquid_glass_surface_tint),
+                    selected = state.surfaceTint,
+                    colors = liquidGlassTintPresets,
+                    onSelected = LiquidGlassSettingsRepository::setSurfaceTint,
+                )
+            }
+            item {
+                GlassColorPresets(
+                    title = stringResource(Res.string.settings_appearance_liquid_glass_text_color),
+                    selected = state.textColor,
+                    colors = liquidGlassTextPresets,
+                    onSelected = LiquidGlassSettingsRepository::setTextColor,
+                )
+            }
+            item {
+                NuvioBottomSheetActionRow(
+                    title = stringResource(Res.string.settings_appearance_liquid_glass_reset),
+                    onClick = LiquidGlassSettingsRepository::reset,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlassSlider(
+    title: String,
+    valueLabel: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    onValueChange: (Float) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 7.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(valueLabel, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Slider(value = value, onValueChange = onValueChange, valueRange = range)
+    }
+}
+
+@Composable
+private fun GlassColorPresets(
+    title: String,
+    selected: Color,
+    colors: List<Color>,
+    onSelected: (Color) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp)) {
+        Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            colors.forEach { color ->
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                        .border(
+                            width = if (color.value == selected.value) 2.dp else 1.dp,
+                            color = if (color.value == selected.value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                            shape = CircleShape,
+                        )
+                        .clickable { onSelected(color) },
+                )
+            }
+        }
+    }
+}
+
+private val liquidGlassTintPresets = listOf(
+    Color.White,
+    Color(0xFF9BE7FF),
+    Color(0xFFC7A6FF),
+    Color(0xFF9FF5C4),
+    Color(0xFFFFB7D8),
+    Color(0xFFFFD39A),
+)
+
+private val liquidGlassTextPresets = listOf(
+    Color.White,
+    Color(0xFFF5F5F7),
+    Color(0xFFBDEBFF),
+    Color(0xFFE5D7FF),
+    Color(0xFF17191D),
+)
+
+private fun Float.formatOne(): String = ((this * 10f).toInt() / 10f).toString()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

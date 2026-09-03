@@ -5,6 +5,7 @@ import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.enabledAddons
+import com.nuvio.app.features.addons.isAnimeOnlyStreamAddon
 import com.nuvio.app.features.addons.fetchAddonResponseText
 import com.nuvio.app.features.debrid.DirectDebridStreamPreparer
 import com.nuvio.app.features.debrid.DebridSettingsRepository
@@ -177,9 +178,14 @@ object StreamsRepository {
         val streamAddons = installedAddons
             .mapNotNull { addon ->
                 val manifest = addon.manifest ?: return@mapNotNull null
+                // Anime-only addons must never leak into movie/TV source lists.
+                // Universal addons are intentionally kept available for both.
+                if (type.lowercase() != "anime" && manifest.isAnimeOnlyStreamAddon()) {
+                    return@mapNotNull null
+                }
                 val supportsRequestedStream = manifest.resources.any { resource ->
-                    resource.name == "stream" &&
-                        resource.types.contains(type) &&
+                    resource.name.equals("stream", ignoreCase = true) &&
+                        resource.types.any { it.equals(type, ignoreCase = true) } &&
                         (resource.idPrefixes.isEmpty() ||
                             resource.idPrefixes.any { videoId.startsWith(it) })
                 }

@@ -173,6 +173,10 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                     if (message != null && tryRefreshCredentialedSourceAfterError(message)) {
                         return@PlatformPlayerSurface
                     }
+                    if (message != null && tryAutomaticSourceFailover()) {
+                        errorMessage = null
+                        return@PlatformPlayerSurface
+                    }
                     errorMessage = message
                     if (message != null) {
                         controlsVisible = !playerControlsLocked

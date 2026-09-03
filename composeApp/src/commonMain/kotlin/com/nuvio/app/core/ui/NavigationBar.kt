@@ -35,6 +35,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -117,6 +119,8 @@ fun NuvioNavigationBar(
     modifier: Modifier = Modifier,
     scrollState: NuvioNavBarScrollState? = null,
     hazeState: HazeState? = null,
+    onSwipeLeft: (() -> Unit)? = null,
+    onSwipeRight: (() -> Unit)? = null,
     content: @Composable NuvioNavigationBarScope.() -> Unit,
 ) {
     val liquidGlassEnabled by ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.collectAsStateWithLifecycle()
@@ -141,6 +145,20 @@ fun NuvioNavigationBar(
     // Outer container — no background, just safe padding
     Box(
         modifier = modifier
+            .pointerInput(onSwipeLeft, onSwipeRight) {
+                var dragDistance = 0f
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { _, dragAmount -> dragDistance += dragAmount },
+                    onDragEnd = {
+                        when {
+                            dragDistance <= -72f -> onSwipeLeft?.invoke()
+                            dragDistance >= 72f -> onSwipeRight?.invoke()
+                        }
+                        dragDistance = 0f
+                    },
+                    onDragCancel = { dragDistance = 0f },
+                )
+            }
             .fillMaxWidth()
             .padding(bottom = bottomSafePadding + nuvioBottomNavigationExtraVerticalPadding + NuvioTokens.Space.s8),
         contentAlignment = Alignment.BottomCenter,
@@ -223,6 +241,9 @@ private class NuvioNavigationBarScopeImpl(
     ) {
         val tokens = MaterialTheme.nuvio
         val palette = ThemeColors.getColorPalette(MaterialTheme.appTheme)
+        LiquidGlassSettingsRepository.ensureLoaded()
+        val glassSettings by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
+        val glassTextColor = if (glassSettings.enabled) glassSettings.textColor else tokens.colors.textMuted
         val iconColor by animateColorAsState(
             targetValue = if (selected) tokens.colors.accent else tokens.colors.textMuted,
             label = "nav_icon_color",
@@ -257,7 +278,7 @@ private class NuvioNavigationBarScopeImpl(
                     contentDescription = contentDescription,
                     tint = if (selected) Color.White else iconColor,
                 )
-                NavItemLabel(label = label, labelFraction = labelFraction, iconColor = iconColor, selected = selected)
+                NavItemLabel(label = label, labelFraction = labelFraction, iconColor = if (selected) iconColor else glassTextColor, selected = selected)
             }
         }
     }
@@ -273,6 +294,9 @@ private class NuvioNavigationBarScopeImpl(
     ) {
         val tokens = MaterialTheme.nuvio
         val palette = ThemeColors.getColorPalette(MaterialTheme.appTheme)
+        LiquidGlassSettingsRepository.ensureLoaded()
+        val glassSettings by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
+        val glassTextColor = if (glassSettings.enabled) glassSettings.textColor else tokens.colors.textMuted
         val iconColor by animateColorAsState(
             targetValue = if (selected) tokens.colors.accent else tokens.colors.textMuted,
             label = "nav_icon_color",
@@ -306,7 +330,7 @@ private class NuvioNavigationBarScopeImpl(
                     contentDescription = contentDescription,
                     tint = if (selected) Color.White else iconColor,
                 )
-                NavItemLabel(label = label, labelFraction = labelFraction, iconColor = iconColor, selected = selected)
+                NavItemLabel(label = label, labelFraction = labelFraction, iconColor = if (selected) iconColor else glassTextColor, selected = selected)
             }
         }
     }
@@ -320,6 +344,9 @@ private class NuvioNavigationBarScopeImpl(
         content: @Composable () -> Unit,
     ) {
         val tokens = MaterialTheme.nuvio
+        LiquidGlassSettingsRepository.ensureLoaded()
+        val glassSettings by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
+        val glassTextColor = if (glassSettings.enabled) glassSettings.textColor else tokens.colors.textMuted
         val selectedBgColor by animateColorAsState(
             targetValue = if (selected) tokens.colors.accent.copy(alpha = NuvioTokens.Opacity.selected)
             else Color.Transparent,
@@ -346,7 +373,7 @@ private class NuvioNavigationBarScopeImpl(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 content()
-                NavItemLabel(label = label, labelFraction = labelFraction, iconColor = iconColor, selected = selected)
+                NavItemLabel(label = label, labelFraction = labelFraction, iconColor = if (selected) iconColor else glassTextColor, selected = selected)
             }
         }
     }

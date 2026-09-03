@@ -21,12 +21,32 @@ actual object ThemeSettingsStorage {
     private const val liquidGlassNativeTabBarEnabledKey = "liquid_glass_native_tab_bar_enabled"
     private const val selectedAppLanguageKey = "selected_app_language"
     private const val NAV_BAR_STYLE_KEY = "nav_bar_style"
+    private const val liquidGlassEnabledKey = "liquid_glass_enabled"
+    private const val liquidGlassVibrancyKey = "liquid_glass_vibrancy"
+    private const val liquidGlassBlurRadiusKey = "liquid_glass_blur_radius"
+    private const val liquidGlassRefractionHeightKey = "liquid_glass_refraction_height"
+    private const val liquidGlassRefractionAmountKey = "liquid_glass_refraction_amount"
+    private const val liquidGlassChromaticAberrationKey = "liquid_glass_chromatic_aberration"
+    private const val liquidGlassDepthEffectKey = "liquid_glass_depth_effect"
+    private const val liquidGlassSurfaceTintKey = "liquid_glass_surface_tint"
+    private const val liquidGlassSurfaceOpacityKey = "liquid_glass_surface_opacity"
+    private const val liquidGlassTextColorKey = "liquid_glass_text_color"
     private val profileScopedSyncKeys = listOf(
         selectedThemeKey,
         themeModeKey,
         amoledEnabledKey,
         liquidGlassNativeTabBarEnabledKey,
         NAV_BAR_STYLE_KEY,
+        liquidGlassEnabledKey,
+        liquidGlassVibrancyKey,
+        liquidGlassBlurRadiusKey,
+        liquidGlassRefractionHeightKey,
+        liquidGlassRefractionAmountKey,
+        liquidGlassChromaticAberrationKey,
+        liquidGlassDepthEffectKey,
+        liquidGlassSurfaceTintKey,
+        liquidGlassSurfaceOpacityKey,
+        liquidGlassTextColorKey,
     )
 
     private var preferences: SharedPreferences? = null
@@ -116,6 +136,30 @@ actual object ThemeSettingsStorage {
             ?.putString(ProfileScopedKey.of(NAV_BAR_STYLE_KEY), styleKey)
             ?.apply()
     }
+
+    actual fun loadLiquidGlassEnabled(): Boolean? = preferences?.let { prefs ->
+        val key = ProfileScopedKey.of(liquidGlassEnabledKey)
+        if (prefs.contains(key)) prefs.getBoolean(key, true) else null
+    }
+    actual fun saveLiquidGlassEnabled(enabled: Boolean) { preferences?.edit()?.putBoolean(ProfileScopedKey.of(liquidGlassEnabledKey), enabled)?.apply() }
+    actual fun loadLiquidGlassVibrancy(): Float? = preferences?.let { prefs -> prefs.getFloat(ProfileScopedKey.of(liquidGlassVibrancyKey), Float.NaN).takeUnless { it.isNaN() } }
+    actual fun saveLiquidGlassVibrancy(value: Float) { preferences?.edit()?.putFloat(ProfileScopedKey.of(liquidGlassVibrancyKey), value)?.apply() }
+    actual fun loadLiquidGlassBlurRadius(): Float? = preferences?.let { prefs -> prefs.getFloat(ProfileScopedKey.of(liquidGlassBlurRadiusKey), Float.NaN).takeUnless { it.isNaN() } }
+    actual fun saveLiquidGlassBlurRadius(value: Float) { preferences?.edit()?.putFloat(ProfileScopedKey.of(liquidGlassBlurRadiusKey), value)?.apply() }
+    actual fun loadLiquidGlassRefractionHeight(): Float? = preferences?.let { prefs -> prefs.getFloat(ProfileScopedKey.of(liquidGlassRefractionHeightKey), Float.NaN).takeUnless { it.isNaN() } }
+    actual fun saveLiquidGlassRefractionHeight(value: Float) { preferences?.edit()?.putFloat(ProfileScopedKey.of(liquidGlassRefractionHeightKey), value)?.apply() }
+    actual fun loadLiquidGlassRefractionAmount(): Float? = preferences?.let { prefs -> prefs.getFloat(ProfileScopedKey.of(liquidGlassRefractionAmountKey), Float.NaN).takeUnless { it.isNaN() } }
+    actual fun saveLiquidGlassRefractionAmount(value: Float) { preferences?.edit()?.putFloat(ProfileScopedKey.of(liquidGlassRefractionAmountKey), value)?.apply() }
+    actual fun loadLiquidGlassChromaticAberration(): Float? = preferences?.let { prefs -> prefs.getFloat(ProfileScopedKey.of(liquidGlassChromaticAberrationKey), Float.NaN).takeUnless { it.isNaN() } }
+    actual fun saveLiquidGlassChromaticAberration(value: Float) { preferences?.edit()?.putFloat(ProfileScopedKey.of(liquidGlassChromaticAberrationKey), value)?.apply() }
+    actual fun loadLiquidGlassDepthEffect(): Float? = preferences?.let { prefs -> prefs.getFloat(ProfileScopedKey.of(liquidGlassDepthEffectKey), Float.NaN).takeUnless { it.isNaN() } }
+    actual fun saveLiquidGlassDepthEffect(value: Float) { preferences?.edit()?.putFloat(ProfileScopedKey.of(liquidGlassDepthEffectKey), value)?.apply() }
+    actual fun loadLiquidGlassSurfaceTint(): String? = preferences?.getString(ProfileScopedKey.of(liquidGlassSurfaceTintKey), null)
+    actual fun saveLiquidGlassSurfaceTint(value: String) { preferences?.edit()?.putString(ProfileScopedKey.of(liquidGlassSurfaceTintKey), value)?.apply() }
+    actual fun loadLiquidGlassSurfaceOpacity(): Float? = preferences?.let { prefs -> prefs.getFloat(ProfileScopedKey.of(liquidGlassSurfaceOpacityKey), Float.NaN).takeUnless { it.isNaN() } }
+    actual fun saveLiquidGlassSurfaceOpacity(value: Float) { preferences?.edit()?.putFloat(ProfileScopedKey.of(liquidGlassSurfaceOpacityKey), value)?.apply() }
+    actual fun loadLiquidGlassTextColor(): String? = preferences?.getString(ProfileScopedKey.of(liquidGlassTextColorKey), null)
+    actual fun saveLiquidGlassTextColor(value: String) { preferences?.edit()?.putString(ProfileScopedKey.of(liquidGlassTextColorKey), value)?.apply() }
 
     actual fun exportToSyncPayload(): JsonObject = buildJsonObject {
         loadSelectedTheme()?.let { put(selectedThemeKey, encodeSyncString(it)) }

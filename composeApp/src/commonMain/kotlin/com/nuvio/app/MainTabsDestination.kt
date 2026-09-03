@@ -76,6 +76,12 @@ internal fun MainTabsDestination(
         val navBarScrollState = rememberNuvioNavBarScrollState()
         val navBarHazeState = rememberHazeState()
         val navBarStyleSetting by remember { ThemeSettingsRepository.navBarStyle }.collectAsStateWithLifecycle()
+        val swipeTabs = remember { listOf(AppScreenTab.Home, AppScreenTab.Search, AppScreenTab.Library, AppScreenTab.Settings) }
+        fun switchTabBySwipe(delta: Int) {
+            val index = swipeTabs.indexOf(selectedTab)
+            val targetIndex = (index + delta).coerceIn(0, swipeTabs.lastIndex)
+            if (targetIndex != index) onTabSelected(swipeTabs[targetIndex])
+        }
 
         Scaffold(
             modifier = Modifier
@@ -166,6 +172,8 @@ internal fun MainTabsDestination(
                         modifier = Modifier.align(Alignment.BottomCenter),
                         scrollState = navBarScrollState,
                         hazeState = navBarHazeState,
+                        onSwipeLeft = { switchTabBySwipe(1) },
+                        onSwipeRight = { switchTabBySwipe(-1) },
                     ) {
                         NavItem(
                             selected = selectedTab == AppScreenTab.Home,

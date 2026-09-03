@@ -31,7 +31,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CheckCircleOutline
@@ -115,7 +115,13 @@ import com.nuvio.app.features.library.TrackingMembershipRemovalConfirmationHost
 import com.nuvio.app.features.library.executeTrackingMembershipOperation
 import com.nuvio.app.features.library.showTrackingMembershipRewriteFeedback
 import com.nuvio.app.features.library.toLibraryItem
+import com.nuvio.app.features.downloads.DownloadMiniWidget
+import com.nuvio.app.features.downloads.DownloadSourcePickerDialog
+import com.nuvio.app.features.downloads.DownloadSourceResolver
+import com.nuvio.app.features.downloads.DownloadTarget
+import com.nuvio.app.features.downloads.DownloadsRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamAutoPlayPolicy
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.tmdb.TmdbService
@@ -226,6 +232,13 @@ fun MetaDetailsScreen(
     var commentsError by remember(type, id) { mutableStateOf<String?>(null) }
     var selectedComment by remember(type, id) { mutableStateOf<TraktCommentReview?>(null) }
     val detailsScope = rememberCoroutineScope()
+    val downloadsUiState by remember {
+        DownloadsRepository.ensureLoaded()
+        DownloadsRepository.uiState
+    }.collectAsStateWithLifecycle()
+    var downloadPickerSources by remember(type, id) { mutableStateOf<List<StreamItem>>(emptyList()) }
+    var downloadPickerTarget by remember(type, id) { mutableStateOf<DownloadTarget?>(null) }
+    var downloadPickerLoading by remember(type, id) { mutableStateOf(false) }
     var showLibraryListPicker by remember(type, id) { mutableStateOf(false) }
     var pickerTabs by remember(type, id) { mutableStateOf<List<TrackingLibraryTab>>(emptyList()) }
     var pickerMembership by remember(type, id) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
@@ -737,6 +750,108 @@ fun MetaDetailsScreen(
                         else -> playText
                     }
                 }
+                fun currentDownloadTarget(): DownloadTarget {
+                    val seriesTarget = seriesAction
+                    return if ((meta.type == "series" || hasEpisodes) && seriesTarget != null) {
+                        DownloadTarget(
+                            contentType = meta.type,
+                            videoId = seriesStreamVideoId ?: seriesTarget.videoId,
+                            parentMetaId = meta.id,
+                            parentMetaType = meta.type,
+                            title = meta.name,
+                            logo = meta.logo,
+                            poster = meta.poster,
+                            background = meta.background,
+                            seasonNumber = seriesTarget.seasonNumber,
+                            episodeNumber = seriesTarget.episodeNumber,
+                            episodeTitle = seriesTarget.episodeTitle,
+                            episodeThumbnail = seriesTarget.episodeThumbnail,
+                        )
+                    } else {
+                        DownloadTarget(
+                            contentType = meta.type,
+                            videoId = meta.id,
+                            parentMetaId = meta.id,
+                            parentMetaType = meta.type,
+                            title = meta.name,
+                            logo = meta.logo,
+                            poster = meta.poster,
+                            background = meta.background,
+                            seasonNumber = null,
+                            episodeNumber = null,
+                            episodeTitle = null,
+                            episodeThumbnail = null,
+                        )
+                    }
+                }
+
+                val enqueueDownload: (DownloadTarget, StreamItem) -> Unit = { target, stream ->
+                    val result = DownloadsRepository.enqueueFromStream(
+                        contentType = target.contentType,
+                        videoId = target.videoId,
+                        parentMetaId = target.parentMetaId,
+                        parentMetaType = target.parentMetaType,
+                        title = target.title,
+                        logo = target.logo,
+                        poster = target.poster,
+                        background = target.background,
+                        seasonNumber = target.seasonNumber,
+                        episodeNumber = target.episodeNumber,
+                        episodeTitle = target.episodeTitle,
+                        episodeThumbnail = target.episodeThumbnail,
+                        stream = stream,
+                    )
+                    NuvioToastController.show(result.toastMessage())
+                }
+
+                val onDownloadClick: () -> Unit = {
+                    val target = currentDownloadTarget()
+                    if (!downloadPickerLoading) {
+                        downloadPickerLoading = true
+                        detailsScope.launch {
+                            val sources = runCatching {
+                                DownloadSourceResolver.loadDownloadableSources(
+                                    type = target.contentType,
+                                    videoId = target.videoId,
+                                    season = target.seasonNumber,
+                                    episode = target.episodeNumber,
+                                )
+                            }.getOrDefault(emptyList())
+                            downloadPickerLoading = false
+                            val best = DownloadSourceResolver.bestSource(sources)
+                            if (best != null) {
+                                enqueueDownload(target, best)
+                            } else {
+                                NuvioToastController.show("No MP4/MKV download source found")
+                            }
+                        }
+                    }
+                }
+
+                val onDownloadLongClick: () -> Unit = {
+                    val target = currentDownloadTarget()
+                    if (!downloadPickerLoading) {
+                        downloadPickerLoading = true
+                        detailsScope.launch {
+                            val sources = runCatching {
+                                DownloadSourceResolver.loadDownloadableSources(
+                                    type = target.contentType,
+                                    videoId = target.videoId,
+                                    season = target.seasonNumber,
+                                    episode = target.episodeNumber,
+                                )
+                            }.getOrDefault(emptyList())
+                            downloadPickerLoading = false
+                            if (sources.isNotEmpty()) {
+                                downloadPickerTarget = target
+                                downloadPickerSources = sources
+                            } else {
+                                NuvioToastController.show("No MP4/MKV download source found")
+                            }
+                        }
+                    }
+                }
+
                 val onPrimaryPlayClick: () -> Unit = {
                     when {
                         (meta.type == "series" || hasEpisodes) && seriesAction != null -> {
@@ -1076,6 +1191,8 @@ fun MetaDetailsScreen(
                                 onPrimaryPlayLongClick = onPrimaryPlayLongClick,
                                 onSaveClick = toggleSaved,
                                 onSaveLongClick = openLibraryListPicker,
+                                onDownloadClick = onDownloadClick,
+                                onDownloadLongClick = onDownloadLongClick,
                                 onWatchedClick = toggleWatched,
                                 showManualPlayOption = showManualPlayOption,
                                 preferredEpisodeSeasonNumber = seriesAction?.seasonNumber,
@@ -1183,6 +1300,35 @@ fun MetaDetailsScreen(
                             onBack = onBackFromDetails,
                             onToggleSaved = toggleSaved,
                         )
+
+                        downloadsUiState.activeItems.firstOrNull()?.let { activeDownload ->
+                            DownloadMiniWidget(
+                                item = activeDownload,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(end = 18.dp, bottom = nuvioSafeBottomPadding(96.dp))
+                                    .zIndex(8f),
+                            )
+                        }
+
+                        if (downloadPickerSources.isNotEmpty() && downloadPickerTarget != null) {
+                            DownloadSourcePickerDialog(
+                                sources = downloadPickerSources,
+                                title = "Choose download source",
+                                onDismiss = {
+                                    downloadPickerSources = emptyList()
+                                    downloadPickerTarget = null
+                                },
+                                onSelected = { stream ->
+                                    val target = downloadPickerTarget
+                                    if (target != null) {
+                                        downloadPickerSources = emptyList()
+                                        downloadPickerTarget = null
+                                        enqueueDownload(target, stream)
+                                    }
+                                },
+                            )
+                        }
 
                         selectedEpisodeForActions
                             ?.takeIf { selectedEpisodeZoomAnchor == null }
@@ -1753,6 +1899,8 @@ private fun LazyListScope.configuredMetaSectionItems(
     onPrimaryPlayLongClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
+    onDownloadClick: () -> Unit,
+    onDownloadLongClick: (() -> Unit)?,
     onWatchedClick: () -> Unit,
     showManualPlayOption: Boolean,
     preferredEpisodeSeasonNumber: Int?,
@@ -1833,6 +1981,8 @@ private fun LazyListScope.configuredMetaSectionItems(
                     onPrimaryPlayLongClick = onPrimaryPlayLongClick,
                     onSaveClick = onSaveClick,
                     onSaveLongClick = onSaveLongClick,
+                    onDownloadClick = onDownloadClick,
+                    onDownloadLongClick = onDownloadLongClick,
                     onWatchedClick = onWatchedClick,
                     showManualPlayOption = showManualPlayOption,
                     preferredEpisodeSeasonNumber = preferredEpisodeSeasonNumber,
@@ -2056,6 +2206,8 @@ private fun ConfiguredMetaSections(
     onPrimaryPlayLongClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
+    onDownloadClick: () -> Unit,
+    onDownloadLongClick: (() -> Unit)?,
     onWatchedClick: () -> Unit,
     showManualPlayOption: Boolean,
     preferredEpisodeSeasonNumber: Int?,
@@ -2130,20 +2282,12 @@ private fun ConfiguredMetaSections(
                             onClick = onWatchedClick,
                         ))
                         add(DetailSecondaryAction(
-                            label = if (isSaved) {
-                                stringResource(Res.string.hero_remove_from_library)
-                            } else {
-                                stringResource(Res.string.hero_add_to_library)
-                            },
-                            icon = if (isSaved) {
-                                Icons.Default.Check
-                            } else {
-                                Icons.Default.Add
-                            },
-                            isActive = isSaved,
-                            onClick = onSaveClick,
-                            onLongClick = onSaveLongClick,
+                            label = "Download",
+                            icon = Icons.Rounded.Download,
+                            onClick = onDownloadClick,
+                            onLongClick = onDownloadLongClick,
                         ))
+
                     },
                     isTablet = isTablet,
                     onPlayClick = onPrimaryPlayClick,

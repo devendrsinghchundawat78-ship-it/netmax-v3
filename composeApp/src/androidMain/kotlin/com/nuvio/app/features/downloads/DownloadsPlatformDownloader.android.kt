@@ -21,6 +21,8 @@ import java.io.FileOutputStream
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
+private const val DEFAULT_DOWNLOAD_USER_AGENT = "Mozilla/5.0 (Android) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36"
+
 private val downloadHttpClient = OkHttpClient.Builder()
     .connectTimeout(60, TimeUnit.SECONDS)
     .readTimeout(60, TimeUnit.SECONDS)
@@ -62,8 +64,16 @@ internal actual object DownloadsPlatformDownloader {
 
                 fun buildRequest(rangeStart: Long?): Request {
                     val requestBuilder = Request.Builder().url(request.sourceUrl)
+                    requestBuilder.header("User-Agent", request.sourceHeaders["User-Agent"] ?: DEFAULT_DOWNLOAD_USER_AGENT)
+                    requestBuilder.header("Accept", request.sourceHeaders["Accept"] ?: "video/*,application/octet-stream,*/*;q=0.8")
+                    requestBuilder.header("Accept-Encoding", "identity")
                     request.sourceHeaders.forEach { (key, value) ->
-                        requestBuilder.header(key, value)
+                        if (!key.equals("User-Agent", ignoreCase = true) &&
+                            !key.equals("Accept", ignoreCase = true) &&
+                            !key.equals("Accept-Encoding", ignoreCase = true)
+                        ) {
+                            requestBuilder.header(key, value)
+                        }
                     }
                     if (rangeStart != null && rangeStart > 0L) {
                         requestBuilder.header("Range", "bytes=$rangeStart-")

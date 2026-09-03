@@ -71,6 +71,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         lockedOverlayVisible = false
         credentialRefreshJob?.cancel()
         credentialRefreshJob = null
+        automaticSourceFailoverAttempts.clear()
         credentialRefreshAttemptedSourceUrl = null
         initialLoadCompleted = false
         lastProgressPersistEpochMs = 0L
@@ -95,6 +96,17 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         PlayerStreamsRepository.clearEpisodeStreams()
         SubtitleRepository.clear()
         WatchProgressRepository.ensureLoaded()
+    }
+
+    // Some broken providers never emit a hard ExoPlayer error and remain buffering.
+    // If another source is already available, fail over once instead of making the user wait indefinitely.
+    LaunchedEffect(activeSourceUrl, activeSourceIdentityKey, playbackSnapshot.isLoading) {
+        if (!playbackSnapshot.isLoading || activeSourceUrl.isBlank()) return@LaunchedEffect
+        delay(AUTOMATIC_SOURCE_FAILOVER_DELAY_MS)
+        if (!playbackSnapshot.isLoading) return@LaunchedEffect
+        if (tryAutomaticSourceFailover()) {
+            errorMessage = null
+        }
     }
 
     LaunchedEffect(
@@ -760,5 +772,6 @@ private fun findCredentialRefreshCandidate(
         .maxByOrNull { (score, _) -> score }
         ?.second
 
+private const val AUTOMATIC_SOURCE_FAILOVER_DELAY_MS = 14_000L
 private const val CREDENTIAL_REFRESH_POLL_COUNT = 30
 private const val CREDENTIAL_REFRESH_POLL_INTERVAL_MS = 500L

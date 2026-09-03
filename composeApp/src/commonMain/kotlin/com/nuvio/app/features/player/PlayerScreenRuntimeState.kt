@@ -129,6 +129,8 @@ internal class PlayerScreenRuntime(
     var playerController by mutableStateOf<PlayerEngineController?>(null)
     var playerControllerSourceUrl by mutableStateOf<String?>(null)
     var errorMessage by mutableStateOf<String?>(null)
+    // Source identities already retried automatically during this player session.
+    val automaticSourceFailoverAttempts: MutableSet<String> = mutableSetOf()
     var isScrubbingTimeline by mutableStateOf(false)
     var scrubbingPositionMs by mutableStateOf<Long?>(null)
     var pausedOverlayVisible by mutableStateOf(false)

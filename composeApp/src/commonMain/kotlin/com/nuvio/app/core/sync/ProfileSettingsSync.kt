@@ -23,6 +23,7 @@ import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.core.ui.PosterCardStyleStorage
 import com.nuvio.app.features.settings.ThemeSettingsStorage
 import com.nuvio.app.features.settings.ThemeSettingsRepository
+import com.nuvio.app.features.settings.LiquidGlassSettingsRepository
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
 import com.nuvio.app.features.streams.StreamBadgeSettingsStorage
 import com.nuvio.app.features.tmdb.TmdbSettingsStorage
@@ -176,6 +177,7 @@ object ProfileSettingsSync {
             ThemeSettingsRepository.amoledEnabled.map { "amoled" },
             ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.map { "liquid_glass_tab_bar" },
             ThemeSettingsRepository.navBarStyle.map { "nav_bar_style" },
+            LiquidGlassSettingsRepository.uiState.map { "liquid_glass" },
             PosterCardStyleRepository.uiState.map { "poster_card_style" },
             CardDepthStyleRepository.uiState.map { "card_depth_style" },
             PlayerSettingsRepository.uiState.map { "player" },
@@ -224,7 +226,10 @@ object ProfileSettingsSync {
         ensureRepositoriesLoaded()
         return MobileProfileSettingsBlob(
             features = MobileProfileSettingsFeatures(
-                themeSettings = ThemeSettingsStorage.exportToSyncPayload(),
+                themeSettings = buildJsonObject {
+                    ThemeSettingsStorage.exportToSyncPayload().forEach { (key, value) -> put(key, value) }
+                    LiquidGlassSettingsRepository.exportToSyncPayload().forEach { (key, value) -> put(key, value) }
+                },
                 posterCardStyleSettingsPayload = PosterCardStyleStorage.loadPayload().orEmpty().trim(),
                 cardDepthStyleSettingsPayload = CardDepthStyleStorage.loadPayload().orEmpty().trim(),
                 playerSettings = withoutProfileCredentials(
@@ -259,6 +264,7 @@ object ProfileSettingsSync {
     private fun applyRemoteBlob(blob: MobileProfileSettingsBlob) {
         ThemeSettingsStorage.replaceFromSyncPayload(blob.features.themeSettings)
         ThemeSettingsRepository.onProfileChanged()
+        LiquidGlassSettingsRepository.replaceFromSyncPayload(blob.features.themeSettings)
 
         PosterCardStyleStorage.savePayload(blob.features.posterCardStyleSettingsPayload)
         PosterCardStyleRepository.onProfileChanged()
@@ -329,6 +335,7 @@ object ProfileSettingsSync {
 
     private fun ensureRepositoriesLoaded() {
         ThemeSettingsRepository.ensureLoaded()
+        LiquidGlassSettingsRepository.ensureLoaded()
         PosterCardStyleRepository.ensureLoaded()
         CardDepthStyleRepository.ensureLoaded()
         PlayerSettingsRepository.ensureLoaded()

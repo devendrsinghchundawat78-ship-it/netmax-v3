@@ -85,6 +85,24 @@ internal fun List<ManagedAddon>.toOverview(): AddonOverview =
 internal fun List<ManagedAddon>.enabledAddons(): List<ManagedAddon> =
     filter { it.enabled }
 
+internal fun AddonManifest.isAnimeOnlyStreamAddon(): Boolean {
+    val streamResources = resources.filter { it.name.equals("stream", ignoreCase = true) }
+    if (streamResources.isEmpty()) return false
+
+    val anime = streamResources.any { resource ->
+        resource.types.any { it.equals("anime", ignoreCase = true) }
+    }
+    val generalVideo = streamResources.any { resource ->
+        resource.types.any { type ->
+            type.equals("movie", ignoreCase = true) ||
+                type.equals("tv", ignoreCase = true) ||
+                type.equals("series", ignoreCase = true) ||
+                type.equals("show", ignoreCase = true)
+        }
+    }
+    return anime && !generalVideo
+}
+
 internal fun List<ManagedAddon>.hasPendingEnabledManifests(): Boolean =
     any { addon -> addon.enabled && addon.isRefreshing }
 

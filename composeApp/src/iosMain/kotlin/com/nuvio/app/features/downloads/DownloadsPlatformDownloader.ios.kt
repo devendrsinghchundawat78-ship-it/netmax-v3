@@ -46,6 +46,7 @@ import platform.posix.fflush
 import platform.posix.fopen
 import platform.posix.fwrite
 
+private const val DEFAULT_DOWNLOAD_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1"
 private const val DOWNLOAD_REQUEST_TIMEOUT_SECONDS = 60.0
 private const val DOWNLOAD_RESOURCE_TIMEOUT_SECONDS = 24.0 * 60.0 * 60.0
 private const val PROGRESS_MIN_INTERVAL_SECONDS = 0.5
@@ -421,8 +422,16 @@ private suspend fun performDownloadRequest(
     nativeRequest.setAllowsCellularAccess(true)
     nativeRequest.setAllowsExpensiveNetworkAccess(true)
     nativeRequest.setAllowsConstrainedNetworkAccess(true)
+    nativeRequest.setValue(request.sourceHeaders["User-Agent"] ?: DEFAULT_DOWNLOAD_USER_AGENT, forHTTPHeaderField = "User-Agent")
+    nativeRequest.setValue(request.sourceHeaders["Accept"] ?: "video/*,application/octet-stream,*/*;q=0.8", forHTTPHeaderField = "Accept")
+    nativeRequest.setValue("identity", forHTTPHeaderField = "Accept-Encoding")
     request.sourceHeaders.forEach { (key, value) ->
-        nativeRequest.setValue(value, forHTTPHeaderField = key)
+        if (!key.equals("User-Agent", ignoreCase = true) &&
+            !key.equals("Accept", ignoreCase = true) &&
+            !key.equals("Accept-Encoding", ignoreCase = true)
+        ) {
+            nativeRequest.setValue(value, forHTTPHeaderField = key)
+        }
     }
     if (rangeStart != null && rangeStart > 0L) {
         nativeRequest.setValue("bytes=$rangeStart-", forHTTPHeaderField = "Range")

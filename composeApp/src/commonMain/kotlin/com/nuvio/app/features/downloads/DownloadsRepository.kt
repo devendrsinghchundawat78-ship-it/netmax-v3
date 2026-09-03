@@ -122,7 +122,7 @@ object DownloadsRepository {
             ?.takeIf { it.isNotBlank() }
             ?: return DownloadEnqueueResult.MissingUrl
 
-        if (!sourceUrl.isSupportedDownloadUrl()) {
+        if (!sourceUrl.isSupportedDownloadFileUrl()) {
             return DownloadEnqueueResult.UnsupportedFormat
         }
 
@@ -539,11 +539,3 @@ private fun String.fileExtensionFromUrl(): String {
     }
 }
 
-private fun String.isSupportedDownloadUrl(): Boolean {
-    val normalized = trim().lowercase()
-    if (normalized.startsWith("magnet:")) return false
-    if (normalized.endsWith(".m3u8") || normalized.contains(".m3u8?")) return false
-    if (normalized.endsWith(".mpd") || normalized.contains(".mpd?")) return false
-    if (normalized.endsWith(".torrent") || normalized.contains(".torrent?")) return false
-    return normalized.startsWith("http://") || normalized.startsWith("https://")
-}
