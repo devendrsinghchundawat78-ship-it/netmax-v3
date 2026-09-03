@@ -236,3 +236,25 @@ git diff --stat  # 8 files, 46 insertions, 17 deletions (7 UI/Download + 1 Profi
    - Ya APK build try karu (Android SDK check ke saath)
 
 **Aap kaho tabhi push/build karunga - abhi sirf local fix hai.**
+
+---
+
+## 🏗️ CI Build Failure — Root Cause & Fix (2026-09-03)
+
+**Pyaala:** Pichhli 2 Actions runs (`33776110807` @ `d4d81b4`, `33799887333` @ `53b3248`) fail ho rahi thi — **pre-existing failure**, is repo state ki. `6_Build Android Full Release APK` step me **127 Kotlin compile errors**.
+
+### Root causes (4)
+1. **`AppFeaturePolicy` + `TrailerPlaybackMode` puri tarah missing** (102 errors): `com.nuvio.app.core.build.AppFeaturePolicy` 27 files me import/used tha lekin koi definition nahi thi (squash commit me kho gaya; generation task bhi generate nahi karta). Same package ka `TrailerPlaybackMode` (imported in MetaDetailsScreen + MetaScreenSettingsPage) bhi missing.
+   - **Fix:** `expect object AppFeaturePolicy` commonMain me + actuals distribution source sets me:
+     - `fullCommonMain` (full Android + iOS): saare features ON, `trailerPlaybackMode = IN_APP`
+     - `androidPlaystore` / `iosAppStore` (store builds): plugins/P2P/in-app updater/IMDb logo OFF, trailer `EXTERNAL`
+     - `TrailerPlaybackMode` enum (`IN_APP`, `EXTERNAL`) commonMain me.
+2. **`NavigationBar.kt` me missing import** (21 errors, incl. cascading): file `com.nuvio.app.features.settings.LiquidGlassSettingsRepository` use karta tha lekin import line missing thi (class `LiquidGlassSettings.kt` me hamesha exist karti thi — isi liye sirf yahi file fail ho rahi thi).
+   - **Fix:** import line add ki. (Original file untouched — pehli reconstruciton attempt revert kar diya.)
+3. **Media3 1.8.0 API change** (3 errors, `PlayerEngine.android.kt`): `TrackOverrides` class 1.8.0 me gayab — `trackSelectionParameters.overrides` ab direct `ImmutableMap<TrackGroup, TrackSelectionOverride>` hai; `overrides.getOverride(group)` → `overrides[group]`. (`TrackSelectionOverride` ab `androidx.media3.common` me hai — import already sahi tha; `trackIndices` field bhi wahi class pe hai.)
+4. **`isSupportedDownloadFileUrl` private visibility** (1 error): `DownloadSourceResolver.kt` me file-private tha lekin `DownloadsRepository.kt` (alag file) call kar raha tha → `internal` kiya.
+
+### Verification
+- 127 errors = 98 (AppFeaturePolicy) + 21 (NavigationBar) + 4 (TrailerPlaybackMode) + 3 (Media3) + 1 (visibility) — har error ka root cause explained.
+- Media3 1.8.0 AAR se class API verify kiya (`TrackSelectionOverride.mediaTrackGroup/trackIndices`, `TrackSelectionParameters.overrides` ImmutableMap).
+- Provider/Data system: **zero changes** — sab fix commonMain UI/build-policy layer + Android player engine me hai.

@@ -2084,7 +2084,7 @@ private fun ExoPlayer.extractVideoTracks(context: Context): List<VideoQualityTra
     var hasManualOverride = false
     for (group in currentTracks.groups) {
         if (group.type != C.TRACK_TYPE_VIDEO) continue
-        if (overrides.getOverride(group.mediaTrackGroup) != null) {
+        if (overrides[group.mediaTrackGroup] != null) {
             hasManualOverride = true
             break
         }
@@ -2092,7 +2092,7 @@ private fun ExoPlayer.extractVideoTracks(context: Context): List<VideoQualityTra
     var globalIdx = 0
     for (group in currentTracks.groups) {
         if (group.type != C.TRACK_TYPE_VIDEO) continue
-        val override = overrides.getOverride(group.mediaTrackGroup)
+        val override = overrides[group.mediaTrackGroup]
         for (trackIdx in 0 until group.length) {
             if (!group.isTrackSupported(trackIdx)) continue
             val format = group.getTrackFormat(trackIdx)

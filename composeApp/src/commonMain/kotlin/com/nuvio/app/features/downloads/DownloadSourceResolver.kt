@@ -161,7 +161,7 @@ internal val StreamItem.downloadQualityLabel: String
 internal fun StreamItem.isDownloadableFileSource(): Boolean =
     downloadableFileUrl != null
 
-private fun String.isSupportedDownloadFileUrl(): Boolean {
+internal fun String.isSupportedDownloadFileUrl(): Boolean {
     val normalized = trim().lowercase()
     if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) return false
     if (normalized.contains(".m3u8") || normalized.contains(".mpd") || normalized.contains(".torrent")) return false

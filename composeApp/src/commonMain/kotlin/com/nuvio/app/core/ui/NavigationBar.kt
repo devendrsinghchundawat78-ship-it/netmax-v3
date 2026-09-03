@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.features.settings.LiquidGlassSettingsRepository
 import com.nuvio.app.features.settings.ThemeSettingsRepository
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
