@@ -267,13 +267,6 @@ object SearchRepository {
         lastDiscoverRequestKey = requestKey
         if (sources.isEmpty()) {
             activeDiscoverJob?.cancel()
-            _discoverUiState.value = DiscoverUiState(
-                isLoading = hasPendingAddonManifests,
-                emptyStateReason = if (hasPendingAddonManifests) null else DiscoverEmptyStateReason.NoDiscoverCatalogs,
-            )
-            return
-        }
-            activeDiscoverJob?.cancel()
             log.d { "Discover refresh found no compatible discover catalogs" }
             _discoverUiState.value = DiscoverUiState(
                 isLoading = hasPendingAddonManifests,

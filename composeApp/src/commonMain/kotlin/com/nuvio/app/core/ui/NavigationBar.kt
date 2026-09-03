@@ -175,14 +175,6 @@ fun NuvioNavigationBar(
         }
     }
 }
-                NuvioNavigationBarScopeImpl(
-                    rowScope = this,
-                    labelFraction = labelFraction,
-                ).content()
-            }
-        }
-    }
-}
 
 interface NuvioNavigationBarScope {
     @Composable
