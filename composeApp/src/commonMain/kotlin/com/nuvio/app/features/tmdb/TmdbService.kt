@@ -111,18 +111,25 @@ object TmdbService {
         }
 }
 
+private const val DEFAULT_TMDB_API_KEY = "15d2ea6d0dc1d476efbca3eba2b9bbfb"
+
 internal fun buildTmdbUrl(
     endpoint: String,
     apiKey: String,
     query: Map<String, String> = emptyMap(),
 ): String {
-    val params = linkedMapOf("api_key" to apiKey)
+    val effectiveKey = if (apiKey.isBlank() || apiKey == "netmax-managed") {
+        DEFAULT_TMDB_API_KEY
+    } else {
+        apiKey.trim()
+    }
+    val params = linkedMapOf("api_key" to effectiveKey)
     query.forEach { (key, value) ->
         if (value.isNotBlank()) {
             params[key] = value
         }
     }
-    val target = buildString {
+    return buildString {
         append("https://api.themoviedb.org/3/")
         append(endpoint.removePrefix("/"))
         if (params.isNotEmpty()) {
@@ -130,13 +137,6 @@ internal fun buildTmdbUrl(
             append(params.entries.joinToString("&") { (key, value) -> "$key=$value" })
         }
     }
-
-    // NetMax-managed key never leaves the app. The Supabase edge function
-    // injects the real TMDB secret server-side.
-    if (apiKey == "netmax-managed") {
-        return "https://rnjukbhdoxozlefhexyq.supabase.co/functions/v1/tmdb?url=${target.encodeURLParameter()}"
-    }
-    return target
 }
 
 @Serializable

@@ -19,6 +19,39 @@ object TmdbHomeCatalogResolver {
 
     fun getTmdbCatalogDefinitions(): List<HomeCatalogDefinition> = listOf(
         HomeCatalogDefinition(
+            key = "tmdb:bollywood_trending",
+            defaultTitle = "Trending Bollywood Movies",
+            catalogName = "Trending Bollywood Movies",
+            addonName = "NetMax TMDB",
+            manifestUrl = "tmdb://bollywood_trending",
+            type = "movie",
+            catalogId = "bollywood_trending",
+            supportsPagination = true,
+            descriptorSignature = "tmdb:bollywood_trending",
+        ),
+        HomeCatalogDefinition(
+            key = "tmdb:bollywood_series",
+            defaultTitle = "Indian Web Series",
+            catalogName = "Indian Web Series",
+            addonName = "NetMax TMDB",
+            manifestUrl = "tmdb://bollywood_series",
+            type = "series",
+            catalogId = "bollywood_series",
+            supportsPagination = true,
+            descriptorSignature = "tmdb:bollywood_series",
+        ),
+        HomeCatalogDefinition(
+            key = "tmdb:bollywood_top_rated",
+            defaultTitle = "Top Rated Bollywood",
+            catalogName = "Top Rated Bollywood",
+            addonName = "NetMax TMDB",
+            manifestUrl = "tmdb://bollywood_top_rated",
+            type = "movie",
+            catalogId = "bollywood_top_rated",
+            supportsPagination = true,
+            descriptorSignature = "tmdb:bollywood_top_rated",
+        ),
+        HomeCatalogDefinition(
             key = "tmdb:trending_movies",
             defaultTitle = "Trending Movies",
             catalogName = "Trending Movies",
@@ -143,6 +176,8 @@ object TmdbHomeCatalogResolver {
 
     fun endpointForDefinition(definition: HomeCatalogDefinition): String =
         when (definition.catalogId) {
+            "bollywood_trending", "bollywood_top_rated" -> "discover/movie"
+            "bollywood_series" -> "discover/tv"
             "trending_movies" -> "trending/movie/day"
             "trending_series" -> "trending/tv/day"
             "popular_movies" -> "movie/popular"
@@ -157,6 +192,9 @@ object TmdbHomeCatalogResolver {
 
     fun queryParamsForDefinition(definition: HomeCatalogDefinition): Map<String, String> =
         when (definition.catalogId) {
+            "bollywood_trending" -> mapOf("with_original_language" to "hi", "sort_by" to "popularity.desc")
+            "bollywood_series" -> mapOf("with_original_language" to "hi", "sort_by" to "popularity.desc")
+            "bollywood_top_rated" -> mapOf("with_original_language" to "hi", "sort_by" to "vote_average.desc", "vote_count.gte" to "50")
             "action_movies" -> mapOf("with_genres" to "28", "sort_by" to "popularity.desc")
             "scifi_movies" -> mapOf("with_genres" to "878", "sort_by" to "popularity.desc")
             "animation_movies" -> mapOf("with_genres" to "16", "sort_by" to "popularity.desc")
