@@ -54,6 +54,8 @@ data class SubtitleStyleState(
     val stripSdh: Boolean = false,
     val useForcedSubtitles: Boolean = false,
     val showOnlyPreferredLanguages: Boolean = false,
+    /** Absolute path of a user-imported subtitle font (TTF/OTF). Null = system default. Device-local only. */
+    val customFontPath: String? = null,
 ) {
     companion object {
         val DEFAULT = SubtitleStyleState()

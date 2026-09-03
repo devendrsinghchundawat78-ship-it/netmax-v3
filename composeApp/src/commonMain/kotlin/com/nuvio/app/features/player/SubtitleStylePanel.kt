@@ -18,11 +18,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -41,6 +46,10 @@ import nuvio.composeapp.generated.resources.compose_player_bold
 import nuvio.composeapp.generated.resources.compose_player_bottom_offset
 import nuvio.composeapp.generated.resources.compose_player_capture_line
 import nuvio.composeapp.generated.resources.compose_player_color
+import nuvio.composeapp.generated.resources.compose_player_font
+import nuvio.composeapp.generated.resources.compose_player_font_delete
+import nuvio.composeapp.generated.resources.compose_player_font_default
+import nuvio.composeapp.generated.resources.compose_player_font_import
 import nuvio.composeapp.generated.resources.compose_player_font_size
 import nuvio.composeapp.generated.resources.compose_player_font_size_value
 import nuvio.composeapp.generated.resources.compose_player_loading_lines
@@ -116,6 +125,13 @@ fun SubtitleStylePanel(
                 onIncrease = {
                     onStyleChanged(style.copy(fontSizeSp = (style.fontSizeSp + 2).coerceAtMost(subtitleFontSizeRangeSp.last)))
                 },
+            )
+        }
+
+        SubtitleStyleSection(title = stringResource(Res.string.compose_player_font)) {
+            SubtitleFontSection(
+                style = style,
+                onStyleChanged = onStyleChanged,
             )
         }
 
@@ -249,6 +265,131 @@ private fun SubtitleStyleStepper(
             icon = Icons.Rounded.Add,
             onClick = onIncrease,
         )
+    }
+}
+
+@Composable
+private fun SubtitleFontSection(
+    style: SubtitleStyleState,
+    onStyleChanged: (SubtitleStyleState) -> Unit,
+) {
+    var importedFonts by remember { mutableStateOf(SubtitleFontStore.listFonts()) }
+    val selectedFont = style.customFontPath
+        ?.let { path -> importedFonts.firstOrNull { it.path == path } }
+    val currentLabel = selectedFont?.displayName
+        ?: stringResource(Res.string.compose_player_font_default)
+
+    // Current font
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White.copy(alpha = 0.06f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Text(
+            text = currentLabel,
+            color = Color.White,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+
+    // Font chips: Default + imported fonts
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SubtitleFontChip(
+            label = stringResource(Res.string.compose_player_font_default),
+            selected = selectedFont == null,
+            onClick = {
+                if (style.customFontPath != null) onStyleChanged(style.copy(customFontPath = null))
+            },
+        )
+        importedFonts.forEach { font ->
+            SubtitleFontChip(
+                label = font.displayName,
+                selected = selectedFont?.path == font.path,
+                deletable = true,
+                onClick = {
+                    if (style.customFontPath != font.path) {
+                        onStyleChanged(style.copy(customFontPath = font.path))
+                    }
+                },
+                onDelete = {
+                    val wasSelected = style.customFontPath == font.path
+                    if (SubtitleFontStore.deleteFont(font.path)) {
+                        importedFonts = SubtitleFontStore.listFonts()
+                        if (wasSelected) {
+                            onStyleChanged(style.copy(customFontPath = null))
+                        }
+                    }
+                },
+            )
+        }
+    }
+
+    // Import new font (TTF/OTF) from the device
+    val startFontPicker = subtitleFontPickerLauncher { uri, name ->
+        val path = SubtitleFontStore.importFontFromUri(uri, name)
+        if (path != null) {
+            importedFonts = SubtitleFontStore.listFonts()
+            onStyleChanged(style.copy(customFontPath = path))
+        }
+    }
+    SubtitleTextAction(
+        label = stringResource(Res.string.compose_player_font_import),
+        enabled = importedFonts.size < 20,
+        onClick = startFontPicker,
+    )
+}
+
+@Composable
+private fun SubtitleFontChip(
+    label: String,
+    selected: Boolean,
+    deletable: Boolean = false,
+    onClick: () -> Unit,
+    onDelete: (() -> Unit)? = null,
+) {
+    val tokens = MaterialTheme.nuvio
+
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) tokens.colors.accent else Color.White.copy(alpha = 0.08f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = label,
+            color = if (selected) tokens.colors.onAccent else Color.White,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (deletable && onDelete != null) {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onDelete),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = stringResource(Res.string.compose_player_font_delete),
+                    tint = if (selected) tokens.colors.onAccent else Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
     }
 }
 

@@ -34,6 +34,7 @@ internal fun ExoPlayer.Builder.buildWithAssSupportCompat(
     renderersFactory: RenderersFactory = DefaultRenderersFactory(context)
 ): ExoPlayer {
     val assHandler = AssHandler(renderType)
+    registerImportedSubtitleFonts(assHandler)
     val assSubtitleParserFactory = CompatAssSubtitleParserFactory(assHandler)
     val assExtractorsFactory = extractorsFactory.withAssMkvSupportCompat(
         subtitleParserFactory = assSubtitleParserFactory,
@@ -58,6 +59,31 @@ internal fun ExoPlayer.Builder.buildWithAssSupportCompat(
 }
 
 internal fun ExoPlayer.getAssHandlerCompat(): AssHandler? = assHandlersByPlayer[this]
+
+/**
+ * Registers user-imported fonts (TTF/OTF) with libass so that ASS/SSA scripts
+ * can reference them via \fn / Style Fontname. Only called when the user has
+ * imported at least one font (keeps libass lazy loading intact otherwise).
+ *
+ * Each font is registered under a couple of name variants (display name and a
+ * compact name) to maximise the chance of matching the script's requested name.
+ */
+private fun registerImportedSubtitleFonts(assHandler: AssHandler) {
+    val importedFonts = runCatching { SubtitleFontStore.listFonts() }.getOrDefault(emptyList())
+    if (importedFonts.isEmpty()) return
+    importedFonts.forEach { font ->
+        val bytes = runCatching { SubtitleFontStore.loadFontBytes(font.path) }.getOrNull() ?: return@forEach
+        val compact = font.assFontName.replace(Regex("[^A-Za-z0-9]"), "")
+        val names = linkedSetOf(font.assFontName, compact)
+        names.filter { it.isNotBlank() }.distinct().forEach { name ->
+            runCatching {
+                assHandler.ass.addFont(name, bytes)
+            }.onFailure {
+                android.util.Log.w("AssFontRegister", "Failed to register subtitle font $name", it)
+            }
+        }
+    }
+}
 
 @OptIn(UnstableApi::class)
 private class CompatAssSubtitleParserFactory(

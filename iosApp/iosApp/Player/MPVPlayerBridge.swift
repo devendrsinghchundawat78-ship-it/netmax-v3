@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import AVFoundation
+import CoreText
 import Libmpv
 import ComposeApp
 
@@ -168,7 +169,8 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         bold: Bool,
         fontSize: Float,
         subPos: Int32,
-        stripSdh: Bool
+        stripSdh: Bool,
+        fontPath: String?
     ) {
         playerVC?.applySubtitleStyle(
             textColor: textColor,
@@ -178,7 +180,8 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
             bold: bold,
             fontSize: fontSize,
             subPos: Int(subPos),
-            stripSdh: stripSdh
+            stripSdh: stripSdh,
+            fontPath: fontPath
         )
     }
 
@@ -806,7 +809,8 @@ final class MPVPlayerViewController: UIViewController {
         bold: Bool,
         fontSize: Float,
         subPos: Int,
-        stripSdh: Bool
+        stripSdh: Bool,
+        fontPath: String?
     ) {
         guard mpv != nil else { return }
 
@@ -827,6 +831,27 @@ final class MPVPlayerViewController: UIViewController {
         checkError(mpv_set_property(mpv, "sub-pos", MPV_FORMAT_INT64, &position))
         setStringProperty("sub-filter-sdh", stripSdh ? "yes" : "no")
         setStringProperty("sub-filter-sdh-harder", stripSdh ? "yes" : "no")
+
+        // Custom subtitle font: point mpv at the font dir and use the font's
+        // own family name. Empty string resets mpv string options to default.
+        if let fontPath, !fontPath.isEmpty {
+            applyCustomSubtitleFont(fontPath)
+        } else {
+            setStringProperty("font", "")
+            setStringProperty("sub-fonts-dir", "")
+        }
+    }
+
+    private func applyCustomSubtitleFont(_ fontPath: String) {
+        guard let url = URL(fileURLWithPath: fontPath) else { return }
+        setStringProperty("sub-fonts-dir", url.deletingLastPathComponent().path)
+        let descriptor = CTFontDescriptorCreateWithAttributes(
+            [kCTFontURLAttribute as String: url as CFURL] as CFDictionary
+        )
+        let font = CTFontCreateWithFontDescriptor(descriptor, 12.0, nil)
+        let familyName = CTFontCopyFamilyName(font) as String
+        guard !familyName.isEmpty else { return }
+        setStringProperty("font", familyName)
     }
 
     func destroyPlayer() {

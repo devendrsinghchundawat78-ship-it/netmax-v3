@@ -73,6 +73,7 @@ interface NuvioPlayerBridge {
         fontSize: Float,
         subPos: Int,
         stripSdh: Boolean,
+        fontPath: String?,
     )
     fun getIsLoading(): Boolean
     fun getIsPlaying(): Boolean

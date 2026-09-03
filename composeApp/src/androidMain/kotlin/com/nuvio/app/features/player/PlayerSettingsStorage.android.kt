@@ -44,6 +44,8 @@ actual object PlayerSettingsStorage {
     private const val subtitleStripSdhKey = "subtitle_strip_sdh"
     private const val subtitleUseForcedSubtitlesKey = "subtitle_use_forced_subtitles"
     private const val subtitleShowOnlyPreferredLanguagesKey = "subtitle_show_only_preferred_languages"
+    // Device-local on purpose: font files live on this device, never synced across profiles.
+    private const val subtitleCustomFontPathKey = "subtitle_custom_font_path"
     private const val streamReuseLastLinkEnabledKey = "stream_reuse_last_link_enabled"
     private const val streamReuseLastLinkCacheHoursKey = "stream_reuse_last_link_cache_hours"
     private const val androidPlaybackEngineKey = "android_playback_engine"
@@ -544,6 +546,18 @@ actual object PlayerSettingsStorage {
         preferences
             ?.edit()
             ?.putBoolean(ProfileScopedKey.of(subtitleShowOnlyPreferredLanguagesKey), enabled)
+            ?.apply()
+    }
+
+    actual fun loadSubtitleCustomFontPath(): String? =
+        preferences?.getString(subtitleCustomFontPathKey, null)
+
+    actual fun saveSubtitleCustomFontPath(path: String?) {
+        preferences
+            ?.edit()
+            ?.apply {
+                if (path == null) remove(subtitleCustomFontPathKey) else putString(subtitleCustomFontPathKey, path)
+            }
             ?.apply()
     }
 
