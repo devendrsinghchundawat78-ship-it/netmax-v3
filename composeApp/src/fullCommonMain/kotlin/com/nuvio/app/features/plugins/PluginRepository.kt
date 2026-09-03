@@ -447,60 +447,65 @@ actual object PluginRepository {
                 .filter { it.repositoryUrl == manifestUrl }
                 .associateBy { it.id }
 
-            val scrapers = manifest.scrapers
-                .filter { scraper -> scraper.isSupportedOnCurrentPlatform() }
-                .mapNotNull { info ->
-                    val scraperId = "${manifestUrl.lowercase()}:${info.id}"
-                    val previous = previousForRepo[scraperId]
-                    val sameVersion = previous != null && previous.version == info.version
-                    runCatching {
-                        // Keep a working cached provider when an upstream CDN is
-                        // temporarily unavailable. Only fetch when the version
-                        // changes or no cached copy exists.
-                        val code = if (sameVersion && previous != null &&
-                            PluginStorage.hasScraperCode(storageProfileId, scraperId)
-                        ) {
-                            PluginStorage.loadScraperCode(storageProfileId, scraperId)
-                                ?: fetchProviderCode(info.filename, baseUrls)
-                        } else {
-                            fetchProviderCode(info.filename, baseUrls)
-                        }
-                        if (code.isNullOrBlank()) {
-                            throw IllegalStateException("Provider code is empty: ${info.id}")
-                        }
-                        val cached = PluginStorage.saveScraperCode(
-                            profileId = storageProfileId,
-                            scraperId = scraperId,
-                            code = code,
-                            overwrite = !sameVersion,
-                        )
-                        if (!cached) {
-                            log.w { "Failed to cache plugin scraper $scraperId" }
-                        }
-                        val enabled = when {
-                            !info.enabled -> false
-                            previous != null -> previous.enabled
-                            else -> info.enabled
-                        }
+            val scrapers = kotlinx.coroutines.coroutineScope {
+                manifest.scrapers
+                    .filter { scraper -> scraper.isSupportedOnCurrentPlatform() }
+                    .map { info ->
+                        kotlinx.coroutines.async {
+                            val scraperId = "${manifestUrl.lowercase()}:${info.id}"
+                            val previous = previousForRepo[scraperId]
+                            val sameVersion = previous != null && previous.version == info.version
+                            runCatching {
+                                // Keep a working cached provider when an upstream CDN is
+                                // temporarily unavailable. Only fetch when the version
+                                // changes or no cached copy exists.
+                                val code = if (sameVersion && previous != null &&
+                                    PluginStorage.hasScraperCode(storageProfileId, scraperId)
+                                ) {
+                                    PluginStorage.loadScraperCode(storageProfileId, scraperId)
+                                        ?: fetchProviderCode(info.filename, baseUrls)
+                                } else {
+                                    fetchProviderCode(info.filename, baseUrls)
+                                }
+                                if (code.isNullOrBlank()) {
+                                    throw IllegalStateException("Provider code is empty: ${info.id}")
+                                }
+                                val cached = PluginStorage.saveScraperCode(
+                                    profileId = storageProfileId,
+                                    scraperId = scraperId,
+                                    code = code,
+                                    overwrite = !sameVersion,
+                                )
+                                if (!cached) {
+                                    log.w { "Failed to cache plugin scraper $scraperId" }
+                                }
+                                val enabled = when {
+                                    !info.enabled -> false
+                                    previous != null -> previous.enabled
+                                    else -> info.enabled
+                                }
 
-                        PluginScraper(
-                            id = scraperId,
-                            repositoryUrl = manifestUrl,
-                            name = info.name,
-                            description = info.description.orEmpty(),
-                            version = info.version,
-                            filename = info.filename,
-                            supportedTypes = info.supportedTypes,
-                            enabled = enabled,
-                            manifestEnabled = info.enabled,
-                            hasSettings = info.hasSettings,
-                            logo = info.logo,
-                            contentLanguage = info.contentLanguage ?: emptyList(),
-                            formats = info.formats ?: info.supportedFormats,
-                            code = code,
-                        )
-                    }.getOrNull()
-                }
+                                PluginScraper(
+                                    id = scraperId,
+                                    repositoryUrl = manifestUrl,
+                                    name = info.name,
+                                    description = info.description.orEmpty(),
+                                    version = info.version,
+                                    filename = info.filename,
+                                    supportedTypes = info.supportedTypes,
+                                    enabled = enabled,
+                                    manifestEnabled = info.enabled,
+                                    hasSettings = info.hasSettings,
+                                    logo = info.logo,
+                                    contentLanguage = info.contentLanguage ?: emptyList(),
+                                    formats = info.formats ?: info.supportedFormats,
+                                    code = code,
+                                )
+                            }.getOrNull()
+                        }
+                    }
+                    .mapNotNull { it.await() }
+            }
 
             val repo = PluginRepositoryItem(
                 manifestUrl = manifestUrl,

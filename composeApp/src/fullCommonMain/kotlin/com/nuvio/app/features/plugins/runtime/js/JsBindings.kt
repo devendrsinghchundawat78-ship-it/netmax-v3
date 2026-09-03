@@ -799,6 +799,8 @@ internal object JsBindings {
                 return $;
             }
         };
+        cheerio.default = cheerio;
+        globalThis.cheerio = cheerio;
 
         function createCheerioWrapper(docId, selector) {
             var elementIds;
@@ -917,6 +919,7 @@ internal object JsBindings {
             }
             throw new Error("Module '" + moduleName + "' is not available");
         };
+        globalThis.require = require;
     """.trimIndent()
 
     private fun arrayPolyfill() = """

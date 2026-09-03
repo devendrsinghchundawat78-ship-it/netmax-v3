@@ -150,20 +150,19 @@ class InAppYouTubeExtractor {
         val videoId = extractVideoId(youtubeUrl) ?: return null
 
         val watchUrl = "https://www.youtube.com/watch?v=$videoId&hl=en"
-        val watchResponse = TrailerExtractionPlatform.performRequest(
-            url = watchUrl,
-            method = "GET",
-            headers = TrailerExtractionPlatform.defaultHeaders,
-            body = null,
-            timeoutMillis = TRAILER_REQUEST_TIMEOUT_MS,
-        )
-        if (!watchResponse.ok) {
-            throw IllegalStateException("Failed to fetch watch page (${watchResponse.status})")
-        }
+        val watchConfig = runCatching {
+            val watchResponse = TrailerExtractionPlatform.performRequest(
+                url = watchUrl,
+                method = "GET",
+                headers = TrailerExtractionPlatform.defaultHeaders,
+                body = null,
+                timeoutMillis = TRAILER_REQUEST_TIMEOUT_MS,
+            )
+            if (watchResponse.ok) getWatchConfig(watchResponse.body) else null
+        }.getOrNull()
 
-        val watchConfig = getWatchConfig(watchResponse.body)
-        val apiKey = watchConfig.apiKey
-            ?: throw IllegalStateException("Unable to extract INNERTUBE_API_KEY")
+        val apiKey = watchConfig?.apiKey?.takeIf { it.isNotBlank() } ?: "AIzaSyAO_FJ2SlqU8Q4VhAfDvRxfAZuzRNOydZU"
+        val visitorData = watchConfig?.visitorData
 
         val progressive = mutableListOf<StreamCandidate>()
         val adaptiveVideo = mutableListOf<StreamCandidate>()
@@ -176,7 +175,7 @@ class InAppYouTubeExtractor {
                     apiKey = apiKey,
                     videoId = videoId,
                     client = client,
-                    visitorData = watchConfig.visitorData,
+                    visitorData = visitorData,
                 )
 
                 val streamingData = playerResponse.objectValue("streamingData") ?: return@runCatching

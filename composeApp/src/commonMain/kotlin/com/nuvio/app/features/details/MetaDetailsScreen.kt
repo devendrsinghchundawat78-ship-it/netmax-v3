@@ -713,13 +713,15 @@ fun MetaDetailsScreen(
                                 if (currentRequestToken != trailerRequestToken) {
                                     return@launch
                                 }
-                                trailerPlaybackSource = resolvedSource
-                                trailerErrorMessage = if (resolvedSource == null) {
-                                    getString(Res.string.trailer_no_playable_stream)
+                                if (resolvedSource != null) {
+                                    trailerPlaybackSource = resolvedSource
+                                    trailerErrorMessage = null
+                                    trailerLoading = false
                                 } else {
-                                    null
+                                    trailerLoading = false
+                                    selectedTrailer = null
+                                    runCatching { uriHandler.openUri(youtubeUrl) }
                                 }
-                                trailerLoading = false
                             }
                         }
                     }

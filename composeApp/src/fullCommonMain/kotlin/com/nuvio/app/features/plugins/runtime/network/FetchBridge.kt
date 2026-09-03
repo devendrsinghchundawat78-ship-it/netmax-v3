@@ -52,7 +52,7 @@ internal class FetchBridge : HostModule {
         followRedirects: Boolean,
     ): String {
         val headers = parseHeaders(headersJson).toMutableMap()
-        if (!headers.containsKey("User-Agent")) {
+        if (headers.keys.none { it.equals("User-Agent", ignoreCase = true) }) {
             headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
 

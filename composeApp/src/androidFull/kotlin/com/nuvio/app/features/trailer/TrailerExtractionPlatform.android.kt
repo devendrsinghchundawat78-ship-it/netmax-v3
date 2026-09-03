@@ -105,16 +105,16 @@ internal object TrailerExtractionPlatform {
         )
     }
 
-    private suspend fun resolveReachableUrlOrNull(url: String): String? {
+    private suspend fun resolveReachableUrlOrNull(url: String): String {
         if (!url.contains("googlevideo.com")) return url
         val uri = Uri.parse(url)
         val mnParam = uri.getQueryParameter("mn") ?: return url
         val servers = mnParam.split(',').map { it.trim() }.filter { it.isNotBlank() }
         if (servers.size < 2) {
-            return if (isUrlReachable(url)) url else null
+            return url
         }
 
-        val host = uri.host ?: return if (isUrlReachable(url)) url else null
+        val host = uri.host ?: return url
         val candidates = mutableListOf(url)
         servers.forEachIndexed { index, server ->
             val altHost = host
@@ -126,7 +126,7 @@ internal object TrailerExtractionPlatform {
         }
 
         if (candidates.size == 1) {
-            return if (isUrlReachable(candidates[0])) candidates[0] else null
+            return url
         }
 
         val result = CompletableDeferred<String>()
@@ -140,7 +140,7 @@ internal object TrailerExtractionPlatform {
         }
 
         return try {
-            withTimeoutOrNull(2_000L) { result.await() }
+            withTimeoutOrNull(2_000L) { result.await() } ?: url
         } finally {
             probeScope.cancel()
         }

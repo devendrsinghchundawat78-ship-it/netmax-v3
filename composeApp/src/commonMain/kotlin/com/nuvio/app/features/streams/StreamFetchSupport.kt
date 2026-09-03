@@ -94,6 +94,8 @@ internal fun PluginRuntimeResult.toStreamItem(
         size?.takeIf { it.isNotBlank() },
         language?.takeIf { it.isNotBlank() },
     )
+    val fallbackDescription = if (title.isNotBlank() && title != name) title else null
+    val streamDescription = subtitleParts.joinToString(" • ").ifBlank { fallbackDescription }
     val requestHeaders = headers
         .orEmpty()
         .mapNotNull { (key, value) ->
@@ -109,7 +111,7 @@ internal fun PluginRuntimeResult.toStreamItem(
 
     return StreamItem(
         name = name ?: title,
-        description = subtitleParts.joinToString(" • ").ifBlank { null },
+        description = streamDescription,
         url = url,
         infoHash = infoHash,
         sourceName = scraper.name,

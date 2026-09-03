@@ -194,23 +194,36 @@ internal object PluginRuntime {
 
     private fun parseJsonResults(rawJson: String): List<PluginRuntimeResult> {
         return runCatching {
-            val array = json.parseToJsonElement(rawJson) as? JsonArray ?: return emptyList()
+            val root = json.parseToJsonElement(rawJson)
+            val array = when (root) {
+                is JsonArray -> root
+                is JsonObject -> ((root["streams"] ?: root["data"] ?: root["results"]) as? JsonArray) ?: return emptyList()
+                else -> return emptyList()
+            }
             array.mapNotNull { element ->
-                val item = element as? JsonObject ?: return@mapNotNull null
-                val url = when (val urlValue = item["url"]) {
+                val rawItem = element as? JsonObject ?: return@mapNotNull null
+                val item = (rawItem["data"] as? JsonObject) ?: rawItem
+                val url = when (val urlValue = item["url"] ?: rawItem["url"]) {
                     is JsonPrimitive -> urlValue.contentOrNull?.takeIf { it.isNotBlank() }
                     is JsonObject -> urlValue["url"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
                     else -> null
                 } ?: return@mapNotNull null
 
-                val headers = (item["headers"] as? JsonObject)
+                val behaviorHeaders = (item["behaviorHints"] as? JsonObject ?: rawItem["behaviorHints"] as? JsonObject)
+                    ?.get("proxyHeaders")?.let { it as? JsonObject }
+                    ?.get("request")?.let { it as? JsonObject }
+                    ?.mapNotNull { (k, v) -> v.jsonPrimitive.contentOrNull?.let { k to it } }
+                    ?.toMap()
+
+                val directHeaders = (item["headers"] as? JsonObject ?: rawItem["headers"] as? JsonObject)
                     ?.mapNotNull { (key, value) ->
                         value.jsonPrimitive.contentOrNull?.let { key to it }
                     }
                     ?.toMap()
-                    ?.takeIf { it.isNotEmpty() }
 
-                val subtitles = (item["subtitles"] as? JsonArray)?.mapNotNull { subElement ->
+                val headers = (behaviorHeaders.orEmpty() + directHeaders.orEmpty()).takeIf { it.isNotEmpty() }
+
+                val subtitles = (item["subtitles"] as? JsonArray ?: rawItem["subtitles"] as? JsonArray)?.mapNotNull { subElement ->
                     val subObj = subElement as? JsonObject ?: return@mapNotNull null
                     val subUrl = subObj["url"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
                     val subLang = subObj["language"]?.jsonPrimitive?.contentOrNull ?: "Unknown"
@@ -229,18 +242,24 @@ internal object PluginRuntime {
                     )
                 }?.takeIf { it.isNotEmpty() }
 
+                val title = item.stringOrNull("title")
+                    ?: rawItem.stringOrNull("title")
+                    ?: item.stringOrNull("name")
+                    ?: rawItem.stringOrNull("name")
+                    ?: runBlocking { getString(Res.string.generic_unknown) }
+
                 PluginRuntimeResult(
-                    title = item.stringOrNull("title") ?: item.stringOrNull("name") ?: runBlocking { getString(Res.string.generic_unknown) },
-                    name = item.stringOrNull("name"),
+                    title = title,
+                    name = item.stringOrNull("name") ?: rawItem.stringOrNull("name"),
                     url = url,
-                    quality = item.stringOrNull("quality"),
-                    size = item.stringOrNull("size"),
-                    language = item.stringOrNull("language"),
-                    provider = item.stringOrNull("provider"),
-                    type = item.stringOrNull("type"),
-                    seeders = item["seeders"]?.jsonPrimitive?.intOrNull,
-                    peers = item["peers"]?.jsonPrimitive?.intOrNull,
-                    infoHash = item.stringOrNull("infoHash"),
+                    quality = item.stringOrNull("quality") ?: rawItem.stringOrNull("quality"),
+                    size = item.stringOrNull("size") ?: rawItem.stringOrNull("size"),
+                    language = item.stringOrNull("language") ?: rawItem.stringOrNull("language"),
+                    provider = item.stringOrNull("provider") ?: rawItem.stringOrNull("provider"),
+                    type = item.stringOrNull("type") ?: rawItem.stringOrNull("type"),
+                    seeders = item["seeders"]?.jsonPrimitive?.intOrNull ?: rawItem["seeders"]?.jsonPrimitive?.intOrNull,
+                    peers = item["peers"]?.jsonPrimitive?.intOrNull ?: rawItem["peers"]?.jsonPrimitive?.intOrNull,
+                    infoHash = item.stringOrNull("infoHash") ?: rawItem.stringOrNull("infoHash"),
                     headers = headers,
                     subtitles = subtitles,
                 )
