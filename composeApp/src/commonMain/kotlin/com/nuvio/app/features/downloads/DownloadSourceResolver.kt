@@ -4,7 +4,9 @@ import com.nuvio.app.features.debrid.DirectDebridPlaybackResolver
 import com.nuvio.app.features.player.PlayerStreamsRepository
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamDebridCacheState
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 
 /** Loads the same provider universe used by the player, then exposes only real file URLs. */
 object DownloadSourceResolver {
@@ -22,8 +24,16 @@ object DownloadSourceResolver {
             forceRefresh = true,
         )
 
-        val state = PlayerStreamsRepository.sourceState.first { state ->
-            !state.isAnyLoading || state.emptyStateReason != null
+        // Guarded wait: if stream resolution never finishes (stuck provider),
+        // fall back to the latest snapshot instead of hanging the download UI.
+        val state = try {
+            withTimeout(30_000) {
+                PlayerStreamsRepository.sourceState.first { state ->
+                    !state.isAnyLoading || state.emptyStateReason != null
+                }
+            }
+        } catch (_: TimeoutCancellationException) {
+            PlayerStreamsRepository.sourceState.value
         }
 
         val direct = state.groups
