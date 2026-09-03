@@ -100,6 +100,7 @@ import kotlinx.coroutines.yield
 import com.nuvio.app.features.home.components.continueWatchingHeroViewportReserveHeight
 import com.nuvio.app.features.home.components.homeSectionHorizontalPaddingForWidth
 import com.nuvio.app.features.home.components.rememberContinueWatchingLayout
+import com.nuvio.app.features.plugins.PluginRepository
 import kotlinx.coroutines.CancellationException
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -120,6 +121,7 @@ fun HomeScreen(
 ) {
     LaunchedEffect(Unit) {
         AddonRepository.initialize()
+        PluginRepository.initialize()
         CollectionRepository.initialize()
         ContinueWatchingPreferencesRepository.ensureLoaded()
         WatchedRepository.ensureLoaded()

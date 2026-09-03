@@ -105,7 +105,7 @@ actual object PluginRepository {
 
     actual fun initialize() {
         val effectiveProfileId = resolveEffectiveProfileId(ProfileRepository.activeProfileId)
-        val shouldRefreshStoredRepos = !initialized || currentProfileId != effectiveProfileId
+        val isFirstInit = !initialized || currentProfileId != effectiveProfileId
         ensureStateLoadedForProfile(effectiveProfileId)
 
         // Always keep the built-in NetMax provider repository present. This
@@ -130,14 +130,13 @@ actual object PluginRepository {
                 ensureInitialized = false,
             )
         }
-        if (!shouldRefreshStoredRepos) return
 
-        val state = _uiState.value
-        val nowEpochMs = currentEpochMillis()
-        state.repositories.filter { repo ->
-            shouldRefreshRepository(repo, state.scrapers, nowEpochMs)
-        }.forEach { repo ->
-            refreshRepositoryInternal(repo.manifestUrl, pushAfterRefresh = false, ensureInitialized = false)
+        if (isFirstInit) {
+            // Auto-update all plugin repositories on every app launch
+            val state = _uiState.value
+            state.repositories.forEach { repo ->
+                refreshRepositoryInternal(repo.manifestUrl, pushAfterRefresh = false, ensureInitialized = false)
+            }
         }
     }
 
