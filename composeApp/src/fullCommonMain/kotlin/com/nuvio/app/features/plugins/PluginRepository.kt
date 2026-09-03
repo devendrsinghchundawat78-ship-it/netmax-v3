@@ -12,6 +12,9 @@ import io.github.jan.supabase.postgrest.rpc
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -447,11 +450,11 @@ actual object PluginRepository {
                 .filter { it.repositoryUrl == manifestUrl }
                 .associateBy { it.id }
 
-            val scrapers = kotlinx.coroutines.coroutineScope {
+            val scrapers = coroutineScope {
                 manifest.scrapers
                     .filter { scraper -> scraper.isSupportedOnCurrentPlatform() }
                     .map { info ->
-                        kotlinx.coroutines.async {
+                        async {
                             val scraperId = "${manifestUrl.lowercase()}:${info.id}"
                             val previous = previousForRepo[scraperId]
                             val sameVersion = previous != null && previous.version == info.version
@@ -504,7 +507,8 @@ actual object PluginRepository {
                             }.getOrNull()
                         }
                     }
-                    .mapNotNull { it.await() }
+                    .awaitAll()
+                    .filterNotNull()
             }
 
             val repo = PluginRepositoryItem(
