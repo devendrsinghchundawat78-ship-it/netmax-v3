@@ -774,11 +774,31 @@ internal object JsBindings {
     """.trimIndent()
 
     private fun cheerioPolyfill() = """
+        function createRawElement(docId, elId) {
+            var tag = __cheerio_tag_name(elId) || 'div';
+            var attribsJson = __cheerio_attribs(elId) || '{}';
+            var attribs = JSON.parse(attribsJson);
+            return {
+                _docId: docId,
+                _elementId: elId,
+                type: 'tag',
+                name: tag,
+                tagName: tag,
+                attribs: attribs,
+                attributes: attribs,
+                children: []
+            };
+        }
+
         var cheerio = {
             load: function(html) {
                 var docId = __cheerio_load(html);
                 var $ = function(selector, context) {
-                    if (selector && selector._elementIds) return selector;
+                    if (!selector) return createCheerioWrapperFromIds(docId, []);
+                    if (typeof selector === 'object') {
+                        if (selector._elementIds) return selector;
+                        if (selector._elementId) return createCheerioWrapperFromIds(docId, [selector._elementId]);
+                    }
                     if (context && context._elementIds && context._elementIds.length > 0) {
                         var allIds = [];
                         for (var i = 0; i < context._elementIds.length; i++) {
@@ -814,14 +834,20 @@ internal object JsBindings {
         }
 
         function createCheerioWrapperFromIds(docId, ids) {
+            var firstTag = ids.length > 0 ? (__cheerio_tag_name(ids[0]) || '') : '';
+            var firstAttribs = ids.length > 0 ? JSON.parse(__cheerio_attribs(ids[0]) || '{}') : {};
             var wrapper = {
                 _docId: docId,
                 _elementIds: ids,
                 length: ids.length,
+                tagName: firstTag,
+                name: firstTag,
+                attribs: firstAttribs,
                 each: function(callback) {
                     for (var i = 0; i < ids.length; i++) {
                         var elWrapper = createCheerioWrapperFromIds(docId, [ids[i]]);
-                        callback.call(elWrapper, i, elWrapper);
+                        var rawEl = createRawElement(docId, ids[i]);
+                        callback.call(elWrapper, i, rawEl);
                     }
                     return wrapper;
                 },
@@ -865,22 +891,41 @@ internal object JsBindings {
                     }
                     return createCheerioWrapperFromIds(docId, prevIds);
                 },
+                parent: function() {
+                    var parentIds = [];
+                    for (var i = 0; i < ids.length; i++) {
+                        var pId = __cheerio_parent(docId, ids[i]);
+                        if (pId && pId !== '__NONE__') parentIds.push(pId);
+                    }
+                    return createCheerioWrapperFromIds(docId, parentIds);
+                },
+                children: function(sel) {
+                    var childIds = [];
+                    for (var i = 0; i < ids.length; i++) {
+                        var cJson = __cheerio_children(docId, ids[i]);
+                        childIds = childIds.concat(JSON.parse(cJson));
+                    }
+                    var childWrapper = createCheerioWrapperFromIds(docId, childIds);
+                    if (sel) return childWrapper.filter(sel);
+                    return childWrapper;
+                },
                 eq: function(index) {
                     if (index >= 0 && index < ids.length) return createCheerioWrapperFromIds(docId, [ids[index]]);
                     return createCheerioWrapperFromIds(docId, []);
                 },
                 get: function(index) {
                     if (typeof index === 'number') {
-                        if (index >= 0 && index < ids.length) return createCheerioWrapperFromIds(docId, [ids[index]]);
+                        if (index >= 0 && index < ids.length) return createRawElement(docId, ids[index]);
                         return undefined;
                     }
-                    return ids.map(function(id) { return createCheerioWrapperFromIds(docId, [id]); });
+                    return ids.map(function(id) { return createRawElement(docId, id); });
                 },
                 map: function(callback) {
                     var results = [];
                     for (var i = 0; i < ids.length; i++) {
                         var elWrapper = createCheerioWrapperFromIds(docId, [ids[i]]);
-                        var result = callback.call(elWrapper, i, elWrapper);
+                        var rawEl = createRawElement(docId, ids[i]);
+                        var result = callback.call(elWrapper, i, rawEl);
                         if (result !== undefined && result !== null) results.push(result);
                     }
                     return {
@@ -894,17 +939,21 @@ internal object JsBindings {
                         var filteredIds = [];
                         for (var i = 0; i < ids.length; i++) {
                             var elWrapper = createCheerioWrapperFromIds(docId, [ids[i]]);
-                            var result = selectorOrCallback.call(elWrapper, i, elWrapper);
+                            var rawEl = createRawElement(docId, ids[i]);
+                            var result = selectorOrCallback.call(elWrapper, i, rawEl);
                             if (result) filteredIds.push(ids[i]);
                         }
                         return createCheerioWrapperFromIds(docId, filteredIds);
                     }
                     return wrapper;
                 },
-                children: function(sel) { return this.find(sel || '*'); },
-                parent: function() { return createCheerioWrapperFromIds(docId, []); },
-                toArray: function() { return ids.map(function(id) { return createCheerioWrapperFromIds(docId, [id]); }); }
+                toArray: function() { return this.get(); }
             };
+
+            for (var i = 0; i < ids.length; i++) {
+                wrapper[i] = createRawElement(docId, ids[i]);
+            }
+
             return wrapper;
         }
     """.trimIndent()

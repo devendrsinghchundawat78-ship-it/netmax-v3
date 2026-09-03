@@ -419,14 +419,11 @@ internal fun AppGate(
         ) { currentGate ->
             when (currentGate) {
                 AppGateScreen.Loading.name -> {
-                    Box(
+                    AppLoadingContent(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(MaterialTheme.nuvio.colors.background),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        NuvioLoadingIndicator(color = MaterialTheme.nuvio.colors.accent)
-                    }
+                    )
                 }
                 AppGateScreen.Auth.name -> {
                     AuthScreen(modifier = Modifier.fillMaxSize())

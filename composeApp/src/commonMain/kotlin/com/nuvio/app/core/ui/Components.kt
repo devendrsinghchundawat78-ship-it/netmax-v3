@@ -272,8 +272,8 @@ fun NuvioIconActionButton(
 fun NuvioBackButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    shape: Shape = LiquidGlassDefaults.ButtonShape,
-    containerColor: Color? = null,
+    shape: Shape = MaterialTheme.nuvio.shapes.avatar,
+    containerColor: Color = MaterialTheme.nuvio.colors.surface,
     contentColor: Color = MaterialTheme.nuvio.colors.textPrimary,
     buttonSize: Dp = NuvioTokens.Space.s40,
     iconSize: Dp = NuvioTokens.Icon.md,
@@ -282,19 +282,19 @@ fun NuvioBackButton(
     if (LocalUseNativeNavigation.current && !LocalNativeNavigationBarHidden.current) return
     val liquidGlassEnabled by ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.collectAsStateWithLifecycle()
 
-    val boxModifier = if (containerColor != null && containerColor != Color.Transparent) {
-        modifier
-            .size(buttonSize)
-            .clip(shape)
-            .background(containerColor)
-    } else {
+    val boxModifier = if (liquidGlassEnabled) {
         modifier
             .size(buttonSize)
             .liquidGlass(
                 shape = shape,
-                isEnabled = liquidGlassEnabled,
+                isEnabled = true,
                 borderWidth = 1.dp,
             )
+    } else {
+        modifier
+            .size(buttonSize)
+            .clip(shape)
+            .background(containerColor)
     }
 
     Box(

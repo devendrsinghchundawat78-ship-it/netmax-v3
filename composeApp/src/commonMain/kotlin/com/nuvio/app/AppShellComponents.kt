@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -389,6 +390,16 @@ internal fun AppLoadingContent(
             Spacer(modifier = Modifier.height(tokens.spacing.sectionGap))
             NuvioLoadingIndicator(color = tokens.colors.accent)
         }
+
+        Text(
+            text = "devraj 💞",
+            style = MaterialTheme.typography.bodySmall,
+            color = tokens.colors.textMuted.copy(alpha = 0.85f),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 24.dp),
+        )
     }
 }
 

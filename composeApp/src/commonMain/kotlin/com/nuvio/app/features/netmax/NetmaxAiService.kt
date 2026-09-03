@@ -1,5 +1,6 @@
 package com.nuvio.app.features.netmax
 
+import com.nuvio.app.core.network.SupabaseProvider
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.functions.functions
 import io.ktor.client.statement.bodyAsText
@@ -20,14 +21,16 @@ object NetmaxAiService {
 
     suspend fun chat(message: String, conversationId: String? = null): AiChatResult {
         val session = NetmaxSupabaseProvider.client.auth.currentSessionOrNull()
-            ?: throw IllegalStateException("NetMax account login required")
-        if (session.accessToken.isBlank()) throw IllegalStateException("NetMax account login required")
+            ?: SupabaseProvider.client.auth.currentSessionOrNull()
         val body = buildJsonObject {
             put("action", "chat")
             put("message", message.take(4000))
             put("newChat", false)
             if (conversationId != null) put("conversationId", conversationId)
             put("clientContext", buildJsonObject { put("app", "NetMax") })
+            if (session != null) {
+                put("accessToken", session.accessToken)
+            }
         }
         return call(body).toChat()
     }

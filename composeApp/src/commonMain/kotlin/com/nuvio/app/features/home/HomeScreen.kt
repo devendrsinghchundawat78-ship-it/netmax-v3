@@ -953,7 +953,7 @@ fun HomeScreen(
                     }
                 }
 
-                !hasActiveAddons && !hasRenderableCollectionRows -> {
+                !hasActiveAddons && !hasRenderableCollectionRows && homeUiState.sections.isEmpty() -> {
                     homeContinueWatchingSections(
                         preferences = continueWatchingPreferences,
                         continueWatchingItems = continueWatchingItems,
@@ -1059,6 +1059,7 @@ fun HomeScreen(
                         disintegrationRequest = continueWatchingDisintegrationRequest,
                     )
 
+                    val renderedSectionKeys = mutableSetOf<String>()
                     keyedEnabledHomeItems.forEach { keyedSettingsItem ->
                         val settingsItem = keyedSettingsItem.value
                         if (settingsItem.isCollection) {
@@ -1077,6 +1078,7 @@ fun HomeScreen(
                         } else {
                             val section = sectionsMap[settingsItem.key]
                             if (section != null && section.items.isNotEmpty()) {
+                                renderedSectionKeys.add(section.key)
                                 item(key = keyedSettingsItem.lazyKey) {
                                     HomeCatalogRowSection(
                                         section = section,
@@ -1094,6 +1096,28 @@ fun HomeScreen(
                                         onPosterLongClick = onPosterLongClick,
                                     )
                                 }
+                            }
+                        }
+                    }
+
+                    homeUiState.sections.forEach { section ->
+                        if (section.items.isNotEmpty() && !renderedSectionKeys.contains(section.key)) {
+                            item(key = "home_section_${section.key}") {
+                                HomeCatalogRowSection(
+                                    section = section,
+                                    entries = section.items.take(HOME_CATALOG_PREVIEW_LIMIT),
+                                    modifier = Modifier.padding(bottom = 12.dp),
+                                    sectionPadding = homeSectionPadding,
+                                    onViewAllClick = if (section.canOpenCatalog(HOME_CATALOG_PREVIEW_LIMIT)) {
+                                        onCatalogClick?.let { { it(section) } }
+                                    } else {
+                                        null
+                                    },
+                                    watchedKeys = watchedUiState.watchedKeys,
+                                    fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                                    onPosterClick = onPosterClick,
+                                    onPosterLongClick = onPosterLongClick,
+                                )
                             }
                         }
                     }

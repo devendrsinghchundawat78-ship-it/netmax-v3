@@ -7,6 +7,8 @@ import com.fleeksoft.ksoup.nodes.Document
 import com.fleeksoft.ksoup.nodes.Element
 import com.fleeksoft.ksoup.select.Elements
 import com.nuvio.app.features.plugins.runtime.host.HostModule
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.random.Random
 
 internal class DomBridge : HostModule {
@@ -88,6 +90,41 @@ internal class DomBridge : HostModule {
             val attrName = args.getOrNull(2)?.toString() ?: ""
             val value = elementCache[elementId]?.attr(attrName)
             if (value.isNullOrEmpty()) "__UNDEFINED__" else value
+        }
+
+        runtime.function("__cheerio_tag_name") { args ->
+            val elementId = args.getOrNull(0)?.toString() ?: ""
+            elementCache[elementId]?.tagName()?.lowercase() ?: ""
+        }
+
+        runtime.function("__cheerio_attribs") { args ->
+            val elementId = args.getOrNull(0)?.toString() ?: ""
+            val element = elementCache[elementId] ?: return@function "{}"
+            val attrs = element.attributes().associate { it.key to it.value }
+            JsonObject(attrs.mapValues { JsonPrimitive(it.value) }).toString()
+        }
+
+        runtime.function("__cheerio_parent") { args ->
+            val docId = args.getOrNull(0)?.toString() ?: ""
+            val elementId = args.getOrNull(1)?.toString() ?: ""
+            val element = elementCache[elementId] ?: return@function "__NONE__"
+            val parent = element.parent() ?: return@function "__NONE__"
+            val parentId = "$docId:parent:${parent.hashCode()}"
+            elementCache[parentId] = parent
+            parentId
+        }
+
+        runtime.function("__cheerio_children") { args ->
+            val docId = args.getOrNull(0)?.toString() ?: ""
+            val elementId = args.getOrNull(1)?.toString() ?: ""
+            val element = elementCache[elementId] ?: return@function "[]"
+            val children = element.children()
+            val ids = children.mapIndexed { index, el ->
+                val id = "$docId:child:$index:${el.hashCode()}"
+                elementCache[id] = el
+                id
+            }
+            "[" + ids.joinToString(",") { "\"${it.replace("\"", "\\\"")}\"" } + "]"
         }
 
         runtime.function("__cheerio_next") { args ->

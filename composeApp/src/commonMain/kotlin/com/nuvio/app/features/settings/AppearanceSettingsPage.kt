@@ -189,16 +189,14 @@ internal fun LazyListScope.appearanceSettingsContent(
                     onCheckedChange = onAmoledToggle,
                     enabled = themeMode == ThemeMode.DARK,
                 )
-                if (liquidGlassNativeTabBarSupported) {
-                    SettingsGroupDivider(isTablet = isTablet)
-                    SettingsSwitchRow(
-                        title = stringResource(Res.string.settings_appearance_liquid_glass),
-                        description = stringResource(Res.string.settings_appearance_liquid_glass_description),
-                        checked = liquidGlassNativeTabBarEnabled,
-                        isTablet = isTablet,
-                        onCheckedChange = onLiquidGlassNativeTabBarToggle,
-                    )
-                }
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_appearance_liquid_glass),
+                    description = stringResource(Res.string.settings_appearance_liquid_glass_description),
+                    checked = liquidGlassNativeTabBarEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = onLiquidGlassNativeTabBarToggle,
+                )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_appearance_app_icon),
