@@ -42,6 +42,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.features.settings.ThemeSettingsRepository
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -117,6 +119,8 @@ fun NuvioNavigationBar(
     hazeState: HazeState? = null,
     content: @Composable NuvioNavigationBarScope.() -> Unit,
 ) {
+    val liquidGlassEnabled by ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.collectAsStateWithLifecycle()
+
     val labelFraction by animateFloatAsState(
         targetValue = scrollState?.labelVisibility ?: 1f,
         animationSpec = tween(
@@ -141,26 +145,16 @@ fun NuvioNavigationBar(
             .padding(bottom = bottomSafePadding + nuvioBottomNavigationExtraVerticalPadding + NuvioTokens.Space.s8),
         contentAlignment = Alignment.BottomCenter,
     ) {
-        // The floating pill
         val glassShape = RoundedCornerShape(NuvioTokens.Radius.full)
-        val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-        val glassTint = if (isLight) Color.White.copy(alpha = 0.72f) else Color(0xFF1C1C1E).copy(alpha = 0.55f)
-        val glassBorder = if (isLight) Color.White.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.16f)
         val pillModifier = Modifier
             .padding(horizontal = horizontalPadding)
             .fillMaxWidth()
-            .clip(glassShape)
-            .then(
-                if (hazeState != null) {
-                    Modifier.hazeEffect(state = hazeState) {
-                        blurRadius = 30.dp
-                    }
-                } else {
-                    Modifier
-                },
+            .liquidGlass(
+                shape = glassShape,
+                hazeState = hazeState,
+                isEnabled = liquidGlassEnabled,
+                borderWidth = 1.2.dp,
             )
-            .background(if (hazeState != null) glassTint else MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
-            .border(1.dp, glassBorder, glassShape)
 
         Box(modifier = pillModifier) {
             Row(
@@ -173,6 +167,14 @@ fun NuvioNavigationBar(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                NuvioNavigationBarScopeImpl(
+                    rowScope = this,
+                    labelFraction = labelFraction,
+                ).content()
+            }
+        }
+    }
+}
                 NuvioNavigationBarScopeImpl(
                     rowScope = this,
                     labelFraction = labelFraction,

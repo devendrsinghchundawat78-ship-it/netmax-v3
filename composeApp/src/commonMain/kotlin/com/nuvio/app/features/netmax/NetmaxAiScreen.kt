@@ -36,11 +36,17 @@ import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
 import kotlinx.coroutines.launch
 
+import com.nuvio.app.core.ui.LiquidGlassBackButton
+import com.nuvio.app.core.ui.liquidGlass
+import com.nuvio.app.core.ui.LiquidGlassDefaults
+import com.nuvio.app.features.settings.ThemeSettingsRepository
+
 private data class ChatLine(val role: String, val text: String, val action: AiPendingAction? = null)
 
 @Composable
 fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val authState by AuthRepository.state.collectAsStateWithLifecycle()
+    val liquidGlassEnabled by ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.collectAsStateWithLifecycle()
     val messages = remember { mutableStateListOf<ChatLine>() }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -64,19 +70,32 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).imePadding(),
     ) {
-        Surface(tonalElevation = 3.dp) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .liquidGlass(
+                    shape = LiquidGlassDefaults.CardShape,
+                    isEnabled = liquidGlassEnabled,
+                )
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
-                Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
+                Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Column(Modifier.weight(1f)) {
                     Text("NETMAX AI", style = MaterialTheme.typography.titleLarge)
                     Text("$remaining AI requests remaining today", style = MaterialTheme.typography.bodySmall)
                 }
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Rounded.ArrowBack, contentDescription = "Back")
-                }
+                LiquidGlassBackButton(
+                    onBack = onBack,
+                    isEnabled = liquidGlassEnabled,
+                    size = 38.dp,
+                    iconSize = 20.dp,
+                )
             }
         }
 

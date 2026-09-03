@@ -25,7 +25,7 @@ object ThemeSettingsRepository {
     private val _amoledEnabled = MutableStateFlow(false)
     val amoledEnabled: StateFlow<Boolean> = _amoledEnabled.asStateFlow()
 
-    private val _liquidGlassNativeTabBarEnabled = MutableStateFlow(false)
+    private val _liquidGlassNativeTabBarEnabled = MutableStateFlow(true)
     val liquidGlassNativeTabBarEnabled: StateFlow<Boolean> = _liquidGlassNativeTabBarEnabled.asStateFlow()
 
     private val _selectedAppLanguage = MutableStateFlow(AppLanguage.DEVICE)
@@ -76,7 +76,7 @@ object ThemeSettingsRepository {
         applyEffectiveTheme()
         _themeMode.value = ThemeMode.fromKey(ThemeSettingsStorage.loadThemeMode())
         _amoledEnabled.value = ThemeSettingsStorage.loadAmoledEnabled() ?: false
-        val liquidGlassEnabled = ThemeSettingsStorage.loadLiquidGlassNativeTabBarEnabled() ?: false
+        val liquidGlassEnabled = ThemeSettingsStorage.loadLiquidGlassNativeTabBarEnabled() ?: true
         _liquidGlassNativeTabBarEnabled.value = liquidGlassEnabled
         NativeTabBridge.publishLiquidGlassEnabled(liquidGlassEnabled)
         val appLanguage = AppLanguage.fromCode(ThemeSettingsStorage.loadSelectedAppLanguage())

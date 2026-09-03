@@ -32,6 +32,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.features.settings.ThemeSettingsRepository
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -180,13 +182,11 @@ fun NuvioScreenHeader(
                 horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
             ) {
                 if (onBack != null) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(Res.string.action_back),
-                            tint = tokens.colors.textPrimary,
-                        )
-                    }
+                    NuvioBackButton(
+                        onClick = onBack,
+                        contentDescription = stringResource(Res.string.action_back),
+                        contentColor = tokens.colors.textPrimary,
+                    )
                 }
                 AnimatedContent(
                     targetState = title,
@@ -272,20 +272,33 @@ fun NuvioIconActionButton(
 fun NuvioBackButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.nuvio.shapes.avatar,
-    containerColor: Color = MaterialTheme.nuvio.colors.surface,
+    shape: Shape = LiquidGlassDefaults.ButtonShape,
+    containerColor: Color? = null,
     contentColor: Color = MaterialTheme.nuvio.colors.textPrimary,
     buttonSize: Dp = NuvioTokens.Space.s40,
     iconSize: Dp = NuvioTokens.Icon.md,
     contentDescription: String = stringResource(Res.string.action_back),
 ) {
     if (LocalUseNativeNavigation.current && !LocalNativeNavigationBarHidden.current) return
+    val liquidGlassEnabled by ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.collectAsStateWithLifecycle()
 
-    Box(
-        modifier = modifier
+    val boxModifier = if (containerColor != null && containerColor != Color.Transparent) {
+        modifier
             .size(buttonSize)
             .clip(shape)
             .background(containerColor)
+    } else {
+        modifier
+            .size(buttonSize)
+            .liquidGlass(
+                shape = shape,
+                isEnabled = liquidGlassEnabled,
+                borderWidth = 1.dp,
+            )
+    }
+
+    Box(
+        modifier = boxModifier
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {

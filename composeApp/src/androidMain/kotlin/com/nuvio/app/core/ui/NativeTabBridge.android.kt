@@ -1,6 +1,6 @@
 package com.nuvio.app.core.ui
 
-internal actual fun isLiquidGlassNativeTabBarSupported(): Boolean = false
+internal actual fun isLiquidGlassNativeTabBarSupported(): Boolean = true
 
 internal actual fun publishLiquidGlassNativeTabBarEnabled(enabled: Boolean) = Unit
 

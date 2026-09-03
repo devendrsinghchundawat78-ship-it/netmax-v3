@@ -75,45 +75,50 @@ jobs:
       - name: Verify Release APK Output
         id: apk-check
         run: |
-          echo "=== Checking Generated Release APKs ==="
+          echo "=== Checking Generated Release APK ==="
           ls -la androidApp/build/outputs/apk/full/release/
           
-          # Count APKs
-          APK_COUNT=$(find androidApp/build/outputs/apk/full/release/ -name "*.apk" | wc -l)
-          echo "Found $APK_COUNT APK(s)"
-          if [ "$APK_COUNT" -eq 0 ]; then
+          VERSION=$(grep "MARKETING_VERSION" iosApp/Configuration/Version.xcconfig | cut -d'=' -f2 | tr -d ' ' || echo "3.1.0")
+          mkdir -p release-output
+          MAIN_APK=$(find androidApp/build/outputs/apk/full/release/ -name "*.apk" | head -n 1)
+          if [ -z "$MAIN_APK" ]; then
             echo "Error: No release APK found!" >&2
             exit 1
           fi
+          echo "Selected APK: $MAIN_APK"
+          cp "$MAIN_APK" "release-output/NetMax-v${VERSION}-release.apk"
+          ls -la release-output/
 
-      - name: Upload Release APK Artifacts
+      - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NetMax-Release-APKs
-          path: androidApp/build/outputs/apk/full/release/*.apk
+          name: NetMax-Release-APK
+          path: release-output/NetMax-v*-release.apk
           if-no-files-found: error
           retention-days: 30
 
-      - name: Create GitHub Release with APKs
+      - name: Create GitHub Release with APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION=$(grep "MARKETING_VERSION" iosApp/Configuration/Version.xcconfig | cut -d'=' -f2 | tr -d ' ' || echo "1.0.0")
+          VERSION=$(grep "MARKETING_VERSION" iosApp/Configuration/Version.xcconfig | cut -d'=' -f2 | tr -d ' ' || echo "3.1.0")
           TAG_NAME="v${VERSION}-${{ github.run_number }}"
-          RELEASE_TITLE="NetMax Release v${VERSION} (Build ${{ github.run_number }})"
+          RELEASE_TITLE="NetMax v${VERSION} Release (Build ${{ github.run_number }})"
           
           echo "Creating Release $TAG_NAME - $RELEASE_TITLE"
           
           gh release create "$TAG_NAME" \
-            androidApp/build/outputs/apk/full/release/*.apk \
+            release-output/NetMax-v*-release.apk \
             --title "$RELEASE_TITLE" \
-            --notes "### NetMax Android Release Build
+            --notes "### NetMax v${VERSION} Android Release Build
           
           **Version:** ${VERSION}
           **Build Number:** ${{ github.run_number }}
           **Commit:** ${{ github.sha }}
           
-          #### Release APKs:
-          - **Universal APK:** Installs on all Android devices
-          - **Architecture-specific APKs:** Optimized for specific CPU architectures (arm64-v8a, armeabi-v7a, x86_64, x86)" \
+          #### What's New:
+          - ✨ **Liquid Glass (Beta)**: Real-time glass blur, specular refraction rim, and fluid design.
+          - 🎬 **Bollywood & Indian Series**: Dedicated home catalog sections.
+          - 🍿 **Universal Scrapers**: NetMax multi-CDN automatic provider support.
+          - 🚀 **Performance**: 60/120fps smooth scrolling with 0 lag or freeze." \
             --generate-notes=false || true
