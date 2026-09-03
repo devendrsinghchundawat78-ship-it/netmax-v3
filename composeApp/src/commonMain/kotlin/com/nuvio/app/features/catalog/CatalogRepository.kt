@@ -8,6 +8,7 @@ import com.nuvio.app.features.library.sortLibraryItems
 import com.nuvio.app.features.library.toMetaPreview
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.filterReleasedItems
+import com.nuvio.app.features.tmdb.TmdbHomeCatalogResolver
 import com.nuvio.app.features.trakt.TraktPublicListSourceResolver
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CoroutineScope
@@ -162,6 +163,13 @@ object CatalogRepository {
 
                     is CatalogTarget.CollectionSource -> fetchCollectionSourcePage(
                         target = target,
+                        page = requestedSkip.takeIf { it > 0 } ?: 1,
+                    )
+
+                    is CatalogTarget.Tmdb -> TmdbHomeCatalogResolver.fetchCatalog(
+                        endpoint = target.endpoint,
+                        queryParams = target.queryParams,
+                        mediaType = target.contentType,
                         page = requestedSkip.takeIf { it > 0 } ?: 1,
                     )
 

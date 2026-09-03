@@ -6,6 +6,7 @@ import com.nuvio.app.features.addons.AddonManifest
 import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.catalog.supportsPagination
+import com.nuvio.app.features.tmdb.TmdbHomeCatalogResolver
 import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.home_catalog_default_title
@@ -40,8 +41,8 @@ fun buildAddonCatalogRefreshSignature(addons: List<ManagedAddon>): List<String> 
         signature.value()
     }.sorted()
 
-fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDefinition> =
-    addons.enabledAddons().mapNotNull { addon ->
+fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDefinition> {
+    val addonCatalogs = addons.enabledAddons().mapNotNull { addon ->
         val manifest = addon.manifest ?: return@mapNotNull null
         addon to manifest
     }.flatMap { (addon, manifest) ->
@@ -67,6 +68,10 @@ fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDef
                 )
             }
     }.distinctBy(HomeCatalogDefinition::key)
+
+    val tmdbCatalogs = TmdbHomeCatalogResolver.getTmdbCatalogDefinitions()
+    return tmdbCatalogs + addonCatalogs
+}
 
 private fun buildHomeCatalogDescriptorSignature(
     addon: ManagedAddon,

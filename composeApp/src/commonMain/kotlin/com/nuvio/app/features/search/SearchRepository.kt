@@ -20,6 +20,7 @@ import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.filterReleasedItems
+import com.nuvio.app.features.tmdb.TmdbHomeCatalogResolver
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -83,36 +84,12 @@ object SearchRepository {
 
         val enabledAddons = addons.enabledAddons()
         val hasPendingAddonManifests = enabledAddons.hasPendingEnabledManifests()
-        val addonManifestErrorMessage = enabledAddons.firstEnabledManifestError()
         val activeAddons = enabledAddons.filter { it.manifest != null }
-        if (activeAddons.isEmpty()) {
-            activeJob?.cancel()
-            lastRequestKey = null
-            _uiState.value = SearchUiState(
-                isLoading = hasPendingAddonManifests,
-                emptyStateReason = when {
-                    hasPendingAddonManifests -> null
-                    addonManifestErrorMessage != null -> SearchEmptyStateReason.RequestFailed
-                    else -> SearchEmptyStateReason.NoActiveAddons
-                },
-                errorMessage = addonManifestErrorMessage,
-            )
-            return
-        }
 
         val requests = buildSearchRequests(
             addons = activeAddons,
             query = normalizedQuery,
         )
-        if (requests.isEmpty()) {
-            activeJob?.cancel()
-            lastRequestKey = null
-            _uiState.value = SearchUiState(
-                isLoading = hasPendingAddonManifests,
-                emptyStateReason = if (hasPendingAddonManifests) null else SearchEmptyStateReason.NoSearchCatalogs,
-            )
-            return
-        }
 
         val requestKey = buildString {
             append(normalizedQuery.lowercase())
@@ -134,15 +111,60 @@ object SearchRepository {
         _uiState.value = SearchUiState(isLoading = true)
 
         activeJob = scope.launch {
+            val totalSlots = requests.size + 1
             val resultChannel = Channel<IndexedSearchResult>(Channel.UNLIMITED)
-            val jobs = requests.mapIndexed { index, request ->
-                launch {
+            val jobs = mutableListOf<Job>()
+
+            jobs += launch {
+                runCatching {
+                    val page = TmdbHomeCatalogResolver.searchMulti(normalizedQuery)
+                    if (page.items.isNotEmpty()) {
+                        HomeCatalogSection(
+                            key = "tmdb:search:${normalizedQuery.lowercase()}",
+                            title = "NetMax TMDB",
+                            subtitle = "TMDB",
+                            addonName = "NetMax TMDB",
+                            target = CatalogTarget.Tmdb(
+                                endpoint = "search/multi",
+                                queryParams = mapOf("query" to normalizedQuery),
+                                contentType = "movie",
+                                catalogTitle = "TMDB: $normalizedQuery",
+                                supportsPagination = true,
+                            ),
+                            items = page.items,
+                            availableItemCount = page.rawItemCount,
+                            hasMore = page.nextSkip != null,
+                        )
+                    } else null
+                }.fold(
+                    onSuccess = { section ->
+                        resultChannel.trySend(
+                            IndexedSearchResult(
+                                index = 0,
+                                section = section,
+                            ),
+                        )
+                    },
+                    onFailure = { error ->
+                        if (error is CancellationException) throw error
+                        resultChannel.trySend(
+                            IndexedSearchResult(
+                                index = 0,
+                                error = error,
+                            ),
+                        )
+                    },
+                )
+            }
+
+            requests.forEachIndexed { index, request ->
+                jobs += launch {
                     runCatching { request.toSection(forceRefresh = forceRefresh) }
                         .fold(
                             onSuccess = { section ->
                                 resultChannel.trySend(
                                     IndexedSearchResult(
-                                        index = index,
+                                        index = index + 1,
                                         section = section,
                                     ),
                                 )
@@ -151,7 +173,7 @@ object SearchRepository {
                                 if (error is CancellationException) throw error
                                 resultChannel.trySend(
                                     IndexedSearchResult(
-                                        index = index,
+                                        index = index + 1,
                                         error = error,
                                     ),
                                 )
@@ -159,11 +181,12 @@ object SearchRepository {
                         )
                 }
             }
+
             val closeChannelJob = launch {
                 jobs.joinAll()
                 resultChannel.close()
             }
-            val results = arrayOfNulls<IndexedSearchResult>(requests.size)
+            val results = arrayOfNulls<IndexedSearchResult>(totalSlots)
 
             try {
                 for (result in resultChannel) {
@@ -222,24 +245,7 @@ object SearchRepository {
     ) {
         val enabledAddons = addons.enabledAddons()
         val hasPendingAddonManifests = enabledAddons.hasPendingEnabledManifests()
-        val addonManifestErrorMessage = enabledAddons.firstEnabledManifestError()
         val activeAddons = enabledAddons.filter { it.manifest != null }
-        if (activeAddons.isEmpty()) {
-            activeDiscoverJob?.cancel()
-            discoverSources = emptyList()
-            lastDiscoverRequestKey = null
-            log.d { "Discover refresh aborted: no active addons" }
-            _discoverUiState.value = DiscoverUiState(
-                isLoading = hasPendingAddonManifests,
-                emptyStateReason = when {
-                    hasPendingAddonManifests -> null
-                    addonManifestErrorMessage != null -> DiscoverEmptyStateReason.RequestFailed
-                    else -> DiscoverEmptyStateReason.NoActiveAddons
-                },
-                errorMessage = addonManifestErrorMessage,
-            )
-            return
-        }
 
         val sources = buildDiscoverSources(activeAddons)
         val current = _discoverUiState.value
@@ -260,6 +266,13 @@ object SearchRepository {
         discoverSources = sources
         lastDiscoverRequestKey = requestKey
         if (sources.isEmpty()) {
+            activeDiscoverJob?.cancel()
+            _discoverUiState.value = DiscoverUiState(
+                isLoading = hasPendingAddonManifests,
+                emptyStateReason = if (hasPendingAddonManifests) null else DiscoverEmptyStateReason.NoDiscoverCatalogs,
+            )
+            return
+        }
             activeDiscoverJob?.cancel()
             log.d { "Discover refresh found no compatible discover catalogs" }
             _discoverUiState.value = DiscoverUiState(
@@ -418,8 +431,77 @@ object SearchRepository {
                 }
         }
 
-    private fun buildDiscoverSources(addons: List<ManagedAddon>): List<DiscoverCatalogOption> =
-        addons.mapNotNull { addon ->
+    private fun buildDiscoverSources(addons: List<ManagedAddon>): List<DiscoverCatalogOption> {
+        val tmdbSources = listOf(
+            DiscoverCatalogOption(
+                key = "tmdb:movie:trending_movies",
+                addonName = "NetMax TMDB",
+                manifestUrl = "tmdb://trending_movies",
+                type = "movie",
+                catalogId = "trending_movies",
+                catalogName = "Trending Movies",
+                genreOptions = emptyList(),
+                genreRequired = false,
+                supportsPagination = true,
+            ),
+            DiscoverCatalogOption(
+                key = "tmdb:movie:popular_movies",
+                addonName = "NetMax TMDB",
+                manifestUrl = "tmdb://popular_movies",
+                type = "movie",
+                catalogId = "popular_movies",
+                catalogName = "Popular Movies",
+                genreOptions = emptyList(),
+                genreRequired = false,
+                supportsPagination = true,
+            ),
+            DiscoverCatalogOption(
+                key = "tmdb:movie:top_rated_movies",
+                addonName = "NetMax TMDB",
+                manifestUrl = "tmdb://top_rated_movies",
+                type = "movie",
+                catalogId = "top_rated_movies",
+                catalogName = "Top Rated Movies",
+                genreOptions = emptyList(),
+                genreRequired = false,
+                supportsPagination = true,
+            ),
+            DiscoverCatalogOption(
+                key = "tmdb:series:trending_series",
+                addonName = "NetMax TMDB",
+                manifestUrl = "tmdb://trending_series",
+                type = "series",
+                catalogId = "trending_series",
+                catalogName = "Trending Series",
+                genreOptions = emptyList(),
+                genreRequired = false,
+                supportsPagination = true,
+            ),
+            DiscoverCatalogOption(
+                key = "tmdb:series:popular_series",
+                addonName = "NetMax TMDB",
+                manifestUrl = "tmdb://popular_series",
+                type = "series",
+                catalogId = "popular_series",
+                catalogName = "Popular Series",
+                genreOptions = emptyList(),
+                genreRequired = false,
+                supportsPagination = true,
+            ),
+            DiscoverCatalogOption(
+                key = "tmdb:series:top_rated_series",
+                addonName = "NetMax TMDB",
+                manifestUrl = "tmdb://top_rated_series",
+                type = "series",
+                catalogId = "top_rated_series",
+                catalogName = "Top Rated Series",
+                genreOptions = emptyList(),
+                genreRequired = false,
+                supportsPagination = true,
+            ),
+        )
+
+        val addonSources = addons.mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
             addon to manifest
         }.flatMap { (addon, manifest) ->
@@ -440,6 +522,8 @@ object SearchRepository {
                     )
                 }
         }
+        return tmdbSources + addonSources
+    }
 
     private suspend fun SearchCatalogRequest.toSection(forceRefresh: Boolean): HomeCatalogSection {
         val manifest = requireNotNull(addon.manifest)
@@ -506,14 +590,32 @@ object SearchRepository {
 
         activeDiscoverJob = scope.launch {
             runCatching {
-                fetchCatalogPage(
-                    manifestUrl = selectedCatalog.manifestUrl,
-                    type = selectedCatalog.type,
-                    catalogId = selectedCatalog.catalogId,
-                    genre = current.selectedGenre,
-                    skip = requestedSkip.takeIf { it > 0 },
-                    forceRefresh = forceRefresh,
-                ).withUnreleasedFilter()
+                if (selectedCatalog.manifestUrl.startsWith("tmdb://")) {
+                    val def = TmdbHomeCatalogResolver.getTmdbCatalogDefinitions()
+                        .firstOrNull { it.catalogId == selectedCatalog.catalogId }
+                    if (def != null) {
+                        TmdbHomeCatalogResolver.fetchCatalogForDefinition(
+                            def,
+                            page = if (requestedSkip > 0) (requestedSkip / CATALOG_PAGE_SIZE) + 1 else 1,
+                        )
+                    } else {
+                        TmdbHomeCatalogResolver.fetchCatalog(
+                            endpoint = if (selectedCatalog.type == "series") "tv/popular" else "movie/popular",
+                            queryParams = emptyMap(),
+                            mediaType = selectedCatalog.type,
+                            page = if (requestedSkip > 0) (requestedSkip / CATALOG_PAGE_SIZE) + 1 else 1,
+                        )
+                    }
+                } else {
+                    fetchCatalogPage(
+                        manifestUrl = selectedCatalog.manifestUrl,
+                        type = selectedCatalog.type,
+                        catalogId = selectedCatalog.catalogId,
+                        genre = current.selectedGenre,
+                        skip = requestedSkip.takeIf { it > 0 },
+                        forceRefresh = forceRefresh,
+                    )
+                }.withUnreleasedFilter()
             }.fold(
                 onSuccess = { page ->
                     val latest = _discoverUiState.value

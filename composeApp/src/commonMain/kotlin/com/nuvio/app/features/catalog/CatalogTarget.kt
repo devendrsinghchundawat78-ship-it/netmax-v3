@@ -30,6 +30,14 @@ sealed interface CatalogTarget {
         override val contentType: String,
         override val supportsPagination: Boolean = false,
     ) : CatalogTarget
+
+    data class Tmdb(
+        val endpoint: String,
+        val queryParams: Map<String, String> = emptyMap(),
+        override val contentType: String,
+        val catalogTitle: String,
+        override val supportsPagination: Boolean = true,
+    ) : CatalogTarget
 }
 
 @Serializable
@@ -37,4 +45,5 @@ enum class CatalogTargetKind {
     ADDON,
     LIBRARY,
     COLLECTION_SOURCE,
+    TMDB,
 }

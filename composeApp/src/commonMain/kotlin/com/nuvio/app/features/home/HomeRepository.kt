@@ -11,6 +11,7 @@ import com.nuvio.app.features.collection.CollectionSource
 import com.nuvio.app.features.collection.TmdbCollectionSourceResolver
 import com.nuvio.app.features.collection.catalogRouteKey
 import com.nuvio.app.features.collection.findCollectionCatalog
+import com.nuvio.app.features.tmdb.TmdbHomeCatalogResolver
 import com.nuvio.app.features.trakt.TraktPublicListSourceResolver
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CoroutineScope
@@ -220,6 +221,28 @@ object HomeRepository {
     }
 
     private suspend fun HomeCatalogDefinition.toSection(forceRefresh: Boolean): HomeCatalogSection {
+        if (key.startsWith("tmdb:")) {
+            val page = TmdbHomeCatalogResolver.fetchCatalogForDefinition(this, page = 1)
+            val endpoint = TmdbHomeCatalogResolver.endpointForDefinition(this)
+            val queryParams = TmdbHomeCatalogResolver.queryParamsForDefinition(this)
+            return HomeCatalogSection(
+                key = key,
+                title = defaultTitle,
+                subtitle = "TMDB",
+                addonName = "NetMax TMDB",
+                target = CatalogTarget.Tmdb(
+                    endpoint = endpoint,
+                    queryParams = queryParams,
+                    contentType = type,
+                    catalogTitle = defaultTitle,
+                    supportsPagination = supportsPagination,
+                ),
+                items = page.items,
+                availableItemCount = page.rawItemCount,
+                hasMore = page.nextSkip != null,
+            )
+        }
+
         val page = fetchCatalogPage(
             manifestUrl = manifestUrl,
             type = type,

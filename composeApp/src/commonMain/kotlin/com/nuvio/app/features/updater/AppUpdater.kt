@@ -23,10 +23,10 @@ import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 
-private const val gitHubOwner = "NuvioMedia"
-private const val gitHubRepo = "NuvioMobile"
+private const val gitHubOwner = "devendrsinghchundawat78-ship-it"
+private const val gitHubRepo = "netmax-v3"
 private const val gitHubApiBase = "https://api.github.com"
-private const val releaseChannelBranch = "cmp-rewrite"
+private const val releaseChannelBranch = "main"
 
 data class AppUpdate(
     val tag: String,
@@ -124,7 +124,7 @@ private object AppUpdaterRepository {
             url = "$gitHubApiBase/repos/$gitHubOwner/$gitHubRepo/releases?per_page=20",
             headers = mapOf(
                 "Accept" to "application/vnd.github+json",
-                "User-Agent" to "NuvioMobile",
+                "User-Agent" to "NetMaxMobile",
             ),
             body = "",
         )
@@ -155,14 +155,7 @@ private object AppUpdaterRepository {
     }
 
     private fun GitHubReleaseDto.matchesRequestedChannel(): Boolean {
-        val channel = releaseChannelBranch
-        if (targetCommitish?.trim()?.equals(channel, ignoreCase = true) == true) {
-            return true
-        }
-
-        return listOf(tagName, name)
-            .filterNotNull()
-            .any { value -> value.contains(channel, ignoreCase = true) }
+        return true
     }
 
     private fun chooseBestApkAsset(assets: List<GitHubAssetDto>): GitHubAssetDto? {
@@ -377,7 +370,7 @@ class AppUpdaterController internal constructor(
         _uiState.value = AppUpdaterUiState(
             update = AppUpdate(
                 tag = "9.9.9",
-                title = "Nuvio 9.9.9",
+                title = "NetMax 9.9.9",
                 notes = """
                     A local preview of the new update experience.
 
@@ -386,7 +379,7 @@ class AppUpdaterController internal constructor(
                     - Release notes live behind the info button.
                 """.trimIndent(),
                 releaseUrl = null,
-                assetName = "Nuvio-debug-preview.apk",
+                assetName = "NetMax-debug-preview.apk",
                 assetUrl = "debug://update-preview",
                 assetSizeBytes = 185L * 1024L * 1024L,
             ),
