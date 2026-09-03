@@ -242,6 +242,19 @@ private fun PlayerScreenRuntime.currentInitialPositionRequestKey(): String? {
 @Composable
 private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, isEpisode: Boolean) {
     val isInPip = rememberIsInPictureInPicture()
+    // Auto-refresh video tracks when HLS is playing and controller is ready
+    androidx.compose.runtime.LaunchedEffect(playerController, playbackSnapshot.isLoading, activeSourceUrl, activeStreamType) {
+        if (playerController != null && !playbackSnapshot.isLoading && isHlsPlaybackSource(activeSourceUrl, activeStreamType)) {
+            kotlinx.coroutines.delay(600)
+            refreshTracks()
+            // Poll a few times to capture adaptive tracks that appear delayed
+            repeat(3) {
+                kotlinx.coroutines.delay(1200)
+                if (playerController != null) refreshTracks()
+            }
+        }
+    }
+    val shouldShowQualityButton = isHlsPlaybackSource(activeSourceUrl, activeStreamType) && videoTracks.count { it.index != -1 } > 1
     AnimatedVisibility(
         visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip,
         enter = fadeIn(),
@@ -280,6 +293,12 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
                 refreshTracks()
                 showAudioModal = true
             },
+            onQualityClick = if (shouldShowQualityButton) {
+                {
+                    refreshTracks()
+                    showVideoQualityModal = true
+                }
+            } else null,
             onVideoSettingsClick = if (isIos) {
                 {
                     showVideoSettingsModal = true
@@ -428,6 +447,23 @@ private fun BoxScope.RenderPlaybackOverlays(
 
 @Composable
 private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
+    // Video quality modal is rendered alongside other modals but handled here to keep hosts unchanged
+    VideoQualityModal(
+        visible = showVideoQualityModal,
+        tracks = videoTracks,
+        selectedIndex = selectedVideoIndex,
+        onTrackSelected = { index ->
+            selectedVideoIndex = index
+            playerController?.selectVideoTrack(index)
+            // Also refresh immediately to reflect new selection
+            scope.launch {
+                kotlinx.coroutines.delay(150)
+                refreshTracks()
+                showVideoQualityModal = false
+            }
+        },
+        onDismiss = { showVideoQualityModal = false },
+    )
     PlayerScreenModalHosts(
         pendingP2pSwitch = pendingP2pSwitch,
         onPendingP2pSwitchChanged = { pendingP2pSwitch = it },

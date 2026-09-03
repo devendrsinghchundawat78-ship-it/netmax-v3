@@ -147,6 +147,10 @@ actual fun PlatformPlayerSurface(
                 }
             }
 
+            override fun getVideoTracks(): List<VideoQualityTrack> = emptyList()
+
+            override fun selectVideoTrack(index: Int) {}
+
             override fun getSubtitleTracks(): List<SubtitleTrack> {
                 val count = bridge.getSubtitleTrackCount()
                 val tracks = (0 until count).map { i ->

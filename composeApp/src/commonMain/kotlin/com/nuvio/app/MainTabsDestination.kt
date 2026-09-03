@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -163,10 +164,12 @@ internal fun MainTabsDestination(
                 }
 
                 if (!isTabletLayout && !useNativeBottomTabs && navBarStyleSetting != NavBarStyle.CLASSIC) {
-                    when (navBarStyleSetting) {
-                        NavBarStyle.EXPANDED -> navBarScrollState.expand()
-                        NavBarStyle.COMPACT -> navBarScrollState.collapse()
-                        else -> {}
+                    LaunchedEffect(navBarStyleSetting) {
+                        when (navBarStyleSetting) {
+                            NavBarStyle.EXPANDED -> navBarScrollState.expand()
+                            NavBarStyle.COMPACT -> navBarScrollState.collapse()
+                            else -> {}
+                        }
                     }
                     NuvioNavigationBar(
                         modifier = Modifier.align(Alignment.BottomCenter),

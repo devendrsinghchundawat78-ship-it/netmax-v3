@@ -130,6 +130,24 @@ fun subtitleColorFromStorage(value: String?): Color? {
     )
 }
 
+data class VideoQualityTrack(
+    val index: Int,
+    val id: String,
+    val label: String,
+    val width: Int = 0,
+    val height: Int = 0,
+    val bitrate: Int = 0,
+    val isSelected: Boolean = false,
+)
+
+fun isHlsPlaybackSource(url: String, streamType: String?): Boolean {
+    val normalizedType = streamType?.trim()?.lowercase()
+    if (normalizedType == "hls" || normalizedType == "m3u8" || normalizedType == "application/x-mpegurl" || normalizedType == "application/vnd.apple.mpegurl") return true
+    val lower = url.lowercase()
+    if (lower.contains(".m3u8")) return true
+    return false
+}
+
 data class SubtitleAudioUiState(
     val audioTracks: List<AudioTrack> = emptyList(),
     val subtitleTracks: List<SubtitleTrack> = emptyList(),
@@ -143,6 +161,9 @@ data class SubtitleAudioUiState(
     val subtitleStyle: SubtitleStyleState = SubtitleStyleState.DEFAULT,
     val showAudioModal: Boolean = false,
     val showSubtitleModal: Boolean = false,
+    val videoTracks: List<VideoQualityTrack> = emptyList(),
+    val selectedVideoIndex: Int = -1,
+    val showVideoQualityModal: Boolean = false,
 )
 
 @Composable

@@ -123,8 +123,7 @@ fun Modifier.liquidGlass(
 ): Modifier {
     LiquidGlassSettingsRepository.ensureLoaded()
     val settings by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
-    val masterGlassEnabled by ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.collectAsStateWithLifecycle()
-    val effectiveEnabled = isEnabled && settings.enabled && masterGlassEnabled
+    val effectiveEnabled = isEnabled && settings.enabled
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
     if (!effectiveEnabled) {

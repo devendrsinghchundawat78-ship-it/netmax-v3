@@ -781,6 +781,9 @@ private fun ExoPlayerSurface(
                     return tracks
                 }
 
+                override fun getVideoTracks(): List<VideoQualityTrack> =
+                    exoPlayer.extractVideoTracks(context)
+
                 override fun selectAudioTrack(index: Int) {
                     exoPlayer.selectTrackByIndex(C.TRACK_TYPE_AUDIO, index)
                 }
@@ -803,6 +806,10 @@ private fun ExoPlayerSurface(
                     exoPlayer.selectTrackByIndex(C.TRACK_TYPE_TEXT, index)
                     Log.d(TAG, "selectSubtitleTrack: after selection, textDisabled=${exoPlayer.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)}")
                     exoPlayer.logCurrentTracks("after selectSubtitleTrack")
+                }
+
+                override fun selectVideoTrack(index: Int) {
+                    exoPlayer.selectVideoQualityTrack(index)
                 }
 
                 override fun setSubtitleUri(url: String) {
@@ -1525,6 +1532,10 @@ private class NuvioLibmpvView(
                     )
                 }
 
+            override fun getVideoTracks(): List<VideoQualityTrack> = emptyList()
+
+            override fun selectVideoTrack(index: Int) {}
+
             override fun selectAudioTrack(index: Int) {
                 if (index < 0) {
                     executeMpv { mpv.setPropertyString("aid", "no") }
@@ -2066,6 +2077,119 @@ private fun ExoPlayer.extractSubtitleTracks(context: Context): List<SubtitleTrac
         idx++
     }
     return tracks
+}
+
+private fun ExoPlayer.extractVideoTracks(context: Context): List<VideoQualityTrack> {
+    val tracks = mutableListOf<VideoQualityTrack>()
+    val overrides = trackSelectionParameters.overrides
+    var hasManualOverride = false
+    for (group in currentTracks.groups) {
+        if (group.type != C.TRACK_TYPE_VIDEO) continue
+        if (overrides.getOverride(group.mediaTrackGroup) != null) {
+            hasManualOverride = true
+            break
+        }
+    }
+    var globalIdx = 0
+    for (group in currentTracks.groups) {
+        if (group.type != C.TRACK_TYPE_VIDEO) continue
+        val override = overrides.getOverride(group.mediaTrackGroup)
+        for (trackIdx in 0 until group.length) {
+            if (!group.isTrackSupported(trackIdx)) continue
+            val format = group.getTrackFormat(trackIdx)
+            val height = format.height
+            val width = format.width
+            val bitrate = format.bitrate
+            val label = when {
+                height > 0 -> "${height}p"
+                width > 0 -> "${width}w"
+                bitrate > 0 -> "${bitrate / 1000} kbps"
+                else -> format.label?.takeIf { it.isNotBlank() } ?: "Track ${globalIdx + 1}"
+            }
+            val isSelected = if (hasManualOverride) {
+                override != null && override.trackIndices.contains(trackIdx)
+            } else {
+                // In Auto, mark the currently rendered track as selected for info, but Auto item (-1) is true selected
+                group.isTrackSelected(trackIdx)
+            }
+            tracks.add(
+                VideoQualityTrack(
+                    index = globalIdx,
+                    id = "${group.mediaTrackGroup.hashCode()}:$trackIdx",
+                    label = label,
+                    width = if (width != Format.NO_VALUE) width else 0,
+                    height = if (height != Format.NO_VALUE) height else 0,
+                    bitrate = if (bitrate != Format.NO_VALUE) bitrate else 0,
+                    isSelected = isSelected,
+                )
+            )
+            globalIdx++
+        }
+    }
+    if (tracks.isEmpty()) return emptyList()
+    // Sort low to high by height then bitrate, so Auto is separate
+    val sorted = tracks.sortedWith(compareBy<VideoQualityTrack> { it.height }.thenBy { it.bitrate }.thenBy { it.width })
+    // Re-index after sort for UI ordering low->high, keep heights ascending
+    val reindexed = sorted.mapIndexed { idx, t -> t.copy(index = idx) }
+    val isAutoSelected = !hasManualOverride
+    val autoTrack = VideoQualityTrack(
+        index = -1,
+        id = "auto",
+        label = "Auto",
+        isSelected = isAutoSelected,
+    )
+    // Return Auto first, then qualities low..high. But if hasManualOverride, Auto not selected.
+    // For consistent selected flag, ensure only correct isSelected true.
+    return listOf(autoTrack.copy(isSelected = isAutoSelected)) + reindexed.map { it.copy(isSelected = if (isAutoSelected) false else it.isSelected) }
+}
+
+private fun ExoPlayer.selectVideoQualityTrack(index: Int) {
+    if (index < 0) {
+        Log.d(TAG, "selectVideoQualityTrack: Auto")
+        trackSelectionParameters = trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+            .build()
+        return
+    }
+    // Need to find group and trackIndex matching global index
+    val videoTracks = extractVideoTracksForSelection()
+    val target = videoTracks.firstOrNull { it.globalIndex == index } ?: run {
+        Log.w(TAG, "selectVideoQualityTrack: no track for index=$index")
+        return
+    }
+    val targetGroup = target.group
+    val trackIdx = target.trackIdx
+    Log.d(TAG, "selectVideoQualityTrack: index=$index height=${target.height} groupHash=${targetGroup.hashCode()} trackIdx=$trackIdx")
+    trackSelectionParameters = trackSelectionParameters.buildUpon()
+        .setOverrideForType(TrackSelectionOverride(targetGroup, listOf(trackIdx)))
+        .build()
+}
+
+private data class InternalVideoTrackRef(
+    val globalIndex: Int,
+    val group: androidx.media3.common.TrackGroup,
+    val trackIdx: Int,
+    val height: Int,
+)
+
+private fun ExoPlayer.extractVideoTracksForSelection(): List<InternalVideoTrackRef> {
+    val refs = mutableListOf<InternalVideoTrackRef>()
+    var globalIdx = 0
+    // Collect in same sorted order as extractVideoTracks to keep indices consistent
+    val temp = mutableListOf<InternalVideoTrackRef>()
+    for (group in currentTracks.groups) {
+        if (group.type != C.TRACK_TYPE_VIDEO) continue
+        for (trackIdx in 0 until group.length) {
+            if (!group.isTrackSupported(trackIdx)) continue
+            val format = group.getTrackFormat(trackIdx)
+            temp.add(InternalVideoTrackRef(globalIdx, group.mediaTrackGroup, trackIdx, if (format.height != Format.NO_VALUE) format.height else 0))
+            globalIdx++
+        }
+    }
+    if (temp.isEmpty()) return emptyList()
+    // Sort same as UI: by height ascending
+    val sorted = temp.sortedWith(compareBy<InternalVideoTrackRef> { it.height })
+    return sorted.mapIndexed { idx, ref -> ref.copy(globalIndex = idx) }
 }
 
 private fun ExoPlayer.selectTrackByIndex(trackType: Int, targetIndex: Int): Boolean {

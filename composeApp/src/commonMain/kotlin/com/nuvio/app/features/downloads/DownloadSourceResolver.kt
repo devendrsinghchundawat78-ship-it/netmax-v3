@@ -58,8 +58,8 @@ object DownloadSourceResolver {
     fun bestSource(sources: List<StreamItem>): StreamItem? =
         sources
             .filter { it.isDownloadableFileSource() }
-            .maxWithOrNull(compareBy<StreamItem> { it.downloadQualityScore }
-                .thenBy { it.downloadAvailabilityScore }
+            .maxWithOrNull(compareByDescending<StreamItem> { it.downloadQualityScore }
+                .thenByDescending { it.downloadAvailabilityScore }
                 .thenByDescending { it.downloadSpeedScore })
 
     fun sourceQuality(stream: StreamItem): String = stream.downloadQualityLabel

@@ -422,8 +422,10 @@ private suspend fun performDownloadRequest(
     nativeRequest.setAllowsCellularAccess(true)
     nativeRequest.setAllowsExpensiveNetworkAccess(true)
     nativeRequest.setAllowsConstrainedNetworkAccess(true)
-    nativeRequest.setValue(request.sourceHeaders["User-Agent"] ?: DEFAULT_DOWNLOAD_USER_AGENT, forHTTPHeaderField = "User-Agent")
-    nativeRequest.setValue(request.sourceHeaders["Accept"] ?: "video/*,application/octet-stream,*/*;q=0.8", forHTTPHeaderField = "Accept")
+    val iosUserAgent = request.sourceHeaders.entries.firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }?.value
+    val iosAccept = request.sourceHeaders.entries.firstOrNull { it.key.equals("Accept", ignoreCase = true) }?.value
+    nativeRequest.setValue(iosUserAgent ?: DEFAULT_DOWNLOAD_USER_AGENT, forHTTPHeaderField = "User-Agent")
+    nativeRequest.setValue(iosAccept ?: "video/*,application/octet-stream,*/*;q=0.8", forHTTPHeaderField = "Accept")
     nativeRequest.setValue("identity", forHTTPHeaderField = "Accept-Encoding")
     request.sourceHeaders.forEach { (key, value) ->
         if (!key.equals("User-Agent", ignoreCase = true) &&

@@ -152,10 +152,17 @@ internal fun PlayerScreenRuntime.refreshTracks() {
     val ctrl = playerController ?: return
     audioTracks = ctrl.getAudioTracks()
     subtitleTracks = ctrl.getSubtitleTracks()
+    videoTracks = ctrl.getVideoTracks()
     val selectedAudio = audioTracks.firstOrNull { it.isSelected }
     if (selectedAudio != null) selectedAudioIndex = selectedAudio.index
     val selectedSub = subtitleTracks.firstOrNull { it.isSelected }
     if (selectedSub != null && !useCustomSubtitles) selectedSubtitleIndex = selectedSub.index
+    val selectedVideo = videoTracks.firstOrNull { it.isSelected }
+    if (selectedVideo != null) selectedVideoIndex = selectedVideo.index else if (videoTracks.isNotEmpty()) {
+        // If no explicit selected (e.g., Auto), fallback to -1
+        val auto = videoTracks.firstOrNull { it.index == -1 && it.isSelected }
+        if (auto != null) selectedVideoIndex = -1
+    }
     if (!playbackSnapshot.isLoading) {
         hasScannedTextTracksOnce = true
     }

@@ -64,8 +64,10 @@ internal actual object DownloadsPlatformDownloader {
 
                 fun buildRequest(rangeStart: Long?): Request {
                     val requestBuilder = Request.Builder().url(request.sourceUrl)
-                    requestBuilder.header("User-Agent", request.sourceHeaders["User-Agent"] ?: DEFAULT_DOWNLOAD_USER_AGENT)
-                    requestBuilder.header("Accept", request.sourceHeaders["Accept"] ?: "video/*,application/octet-stream,*/*;q=0.8")
+                    val userAgent = request.sourceHeaders.entries.firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }?.value
+                    val accept = request.sourceHeaders.entries.firstOrNull { it.key.equals("Accept", ignoreCase = true) }?.value
+                    requestBuilder.header("User-Agent", userAgent ?: DEFAULT_DOWNLOAD_USER_AGENT)
+                    requestBuilder.header("Accept", accept ?: "video/*,application/octet-stream,*/*;q=0.8")
                     requestBuilder.header("Accept-Encoding", "identity")
                     request.sourceHeaders.forEach { (key, value) ->
                         if (!key.equals("User-Agent", ignoreCase = true) &&

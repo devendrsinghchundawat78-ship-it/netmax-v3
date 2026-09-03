@@ -197,10 +197,7 @@ internal fun LazyListScope.appearanceSettingsContent(
                     description = stringResource(Res.string.settings_appearance_liquid_glass_description),
                     checked = liquidGlassNativeTabBarEnabled,
                     isTablet = isTablet,
-                    onCheckedChange = { enabled ->
-                        onLiquidGlassNativeTabBarToggle(enabled)
-                        LiquidGlassSettingsRepository.setEnabled(enabled)
-                    },
+                    onCheckedChange = onLiquidGlassNativeTabBarToggle,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(

@@ -128,6 +128,13 @@ object ProfileRepository {
         try {
             val result = SupabaseProvider.client.postgrest.rpc("sync_pull_profiles")
             val profiles = result.decodeList<NuvioProfile>()
+            // Guard: stale empty pull shouldn't wipe optimistic local profile created during race
+            // If server returns empty but we already have local profiles (optimistic create), keep local
+            if (profiles.isEmpty() && _state.value.profiles.isNotEmpty() && _state.value.isLoaded) {
+                log.w { "pullProfiles returned empty but local has ${ _state.value.profiles.size } profiles - keeping optimistic" }
+                _state.value = _state.value.copy(isLoaded = true)
+                return
+            }
             _state.value = _state.value.copy(
                 profiles = profiles.sortedBy { it.profileIndex },
                 isLoaded = true,
@@ -192,6 +199,9 @@ object ProfileRepository {
             applyPayloadsLocally(profiles)
             return
         }
+        // Optimistic local update — ensures ProfileSelection doesn't loop if network/RPC fails
+        // This fixes the "login ke baad profile banane par loop" bug while still syncing to server
+        applyPayloadsLocally(profiles)
         try {
             val params = buildJsonObject {
                 put("p_client_max_profiles", MAX_PROFILES)
@@ -202,7 +212,7 @@ object ProfileRepository {
             pullProfiles()
         } catch (e: Throwable) {
             if (AuthRepository.signOutIfSessionInvalid(e, "Profile push")) return
-            log.e(e) { "Failed to push profiles" }
+            log.e(e) { "Failed to push profiles - keeping optimistic local profile" }
         }
     }
 
