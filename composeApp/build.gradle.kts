@@ -414,6 +414,10 @@ kotlin {
                 implementation("com.squareup.okhttp3:okhttp:4.12.0")
                 implementation("com.google.code.gson:gson:2.11.0")
                 implementation("io.github.peerless2012:ass-media:0.4.0-beta01")
+                // ass-kt is only a runtime dependency of ass-media, but our code
+                // references io.github.peerless2012.ass.Ass (AssHandler.ass) for
+                // imported-font registration, so it must be on the compile classpath.
+                implementation("io.github.peerless2012:ass-kt:0.4.0-beta01")
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.sentry.android)
                 implementation(libs.androidx.media3.exoplayer.hls)

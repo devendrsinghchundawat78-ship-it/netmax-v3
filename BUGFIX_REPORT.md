@@ -258,3 +258,8 @@ git diff --stat  # 8 files, 46 insertions, 17 deletions (7 UI/Download + 1 Profi
 - 127 errors = 98 (AppFeaturePolicy) + 21 (NavigationBar) + 4 (TrailerPlaybackMode) + 3 (Media3) + 1 (visibility) — har error ka root cause explained.
 - Media3 1.8.0 AAR se class API verify kiya (`TrackSelectionOverride.mediaTrackGroup/trackIndices`, `TrackSelectionParameters.overrides` ImmutableMap).
 - Provider/Data system: **zero changes** — sab fix commonMain UI/build-policy layer + Android player engine me hai.
+
+### Follow-up (run `33845612357` @ `39a311a`)
+Upar ke 127 errors ke baad sirf 4 errors baaki the — dono meri subtitle-font feature se (`PlayerLibassCompat.registerImportedSubtitleFonts`):
+`Cannot access class 'io.github.peerless2012.ass.Ass'` — `AssHandler.ass` ka type `Ass` **`ass-kt`** artifact me hai jo ass-media ka sirf *runtime* dependency hai (compile classpath pe nahi tha).
+**Fix:** `composeApp/build.gradle.kts` me `implementation("io.github.peerless2012:ass-kt:0.4.0-beta01")` add kiya (runtime behavior unchanged — wo runtime classpath pe pehle se tha; `addFont(String, byte[])` signature AAR se verified).
