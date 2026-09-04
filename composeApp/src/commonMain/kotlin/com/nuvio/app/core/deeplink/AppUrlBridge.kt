@@ -1,12 +1,16 @@
 package com.nuvio.app.core.deeplink
 
+import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.tracking.ensureTrackingProvidersRegistered
 import com.nuvio.app.features.tracking.TrackingProviderRegistry
 import io.ktor.http.Url
 import io.ktor.http.encodeURLParameter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 internal sealed interface AppDeepLink {
     data class Meta(
@@ -44,6 +48,9 @@ fun handleAppUrl(url: String) {
 
     ensureTrackingProvidersRegistered()
     TrackingProviderRegistry.handleAuthCallback(normalizedUrl)
+    CoroutineScope(Dispatchers.Default).launch {
+        AuthRepository.handleAuthDeeplink(normalizedUrl)
+    }
     AppDeepLinkRepository.handleUrl(normalizedUrl)
 }
 

@@ -18,6 +18,7 @@ actual object ThemeSettingsStorage {
     private const val selectedAppLanguageKey = "selected_app_language"
     private const val navBarStyleKey = "nav_bar_style"
     private const val liquidGlassEnabledKey = "liquid_glass_enabled"
+    private const val enhancedLiquidGlassKey = "enhanced_liquid_glass"
     private const val liquidGlassVibrancyKey = "liquid_glass_vibrancy"
     private const val liquidGlassBlurRadiusKey = "liquid_glass_blur_radius"
     private const val liquidGlassRefractionHeightKey = "liquid_glass_refraction_height"
@@ -34,6 +35,7 @@ actual object ThemeSettingsStorage {
         liquidGlassNativeTabBarEnabledKey,
         navBarStyleKey,
         liquidGlassEnabledKey,
+        enhancedLiquidGlassKey,
         liquidGlassVibrancyKey,
         liquidGlassBlurRadiusKey,
         liquidGlassRefractionHeightKey,
@@ -128,6 +130,8 @@ actual object ThemeSettingsStorage {
 
     actual fun loadLiquidGlassEnabled(): Boolean? = loadBool(liquidGlassEnabledKey)
     actual fun saveLiquidGlassEnabled(enabled: Boolean) = NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(liquidGlassEnabledKey))
+    actual fun loadEnhancedLiquidGlass(): Boolean? = loadBool(enhancedLiquidGlassKey)
+    actual fun saveEnhancedLiquidGlass(enabled: Boolean) = NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(enhancedLiquidGlassKey))
     actual fun loadLiquidGlassVibrancy(): Float? = loadFloat(liquidGlassVibrancyKey)
     actual fun saveLiquidGlassVibrancy(value: Float) = NSUserDefaults.standardUserDefaults.setDouble(value.toDouble(), forKey = ProfileScopedKey.of(liquidGlassVibrancyKey))
     actual fun loadLiquidGlassBlurRadius(): Float? = loadFloat(liquidGlassBlurRadiusKey)

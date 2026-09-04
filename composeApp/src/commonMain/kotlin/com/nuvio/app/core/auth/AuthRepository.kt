@@ -7,6 +7,8 @@ import com.nuvio.app.features.netmax.NetmaxAuthBridge
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.exception.AuthRestException
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.providers.builtin.Google
+import io.github.jan.supabase.auth.user.UserSession
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.functions.functions
@@ -137,6 +139,69 @@ object AuthRepository {
         log.e(e) { "Email sign-in failed" }
         _error.value = e.safeAuthErrorDescription()
             ?: getString(Res.string.auth_sign_in_failed)
+    }
+
+    suspend fun signInWithGoogle(): Result<Unit> = runCatching {
+        _error.value = null
+        SupabaseProvider.client.auth.signInWith(Google)
+        val user = SupabaseProvider.client.auth.currentUserOrNull()
+        if (user != null) {
+            val email = user.email.orEmpty()
+            if (email.isNotBlank()) {
+                NetmaxAuthBridge.signIn(email, "oauth_google_${user.id}")
+            }
+        }
+    }.onFailure { e ->
+        log.e(e) { "Google sign-in failed" }
+        _error.value = e.safeAuthErrorDescription()
+            ?: getString(Res.string.auth_sign_in_failed)
+    }
+
+    suspend fun handleAuthDeeplink(url: String): Boolean {
+        if (!url.startsWith("nuvio://", ignoreCase = true)) return false
+        val fragment = url.substringAfter('#', missingDelimiterValue = "")
+        val query = url.substringAfter('?', missingDelimiterValue = "").substringBefore('#')
+        val params = (fragment.ifBlank { query }).split('&').associate {
+            val parts = it.split('=', limit = 2)
+            parts[0].trim().lowercase() to (parts.getOrNull(1)?.trim().orEmpty())
+        }
+
+        val accessToken = params["access_token"]
+        val refreshToken = params["refresh_token"]
+        if (!accessToken.isNullOrBlank() && !refreshToken.isNullOrBlank()) {
+            val expiresIn = params["expires_in"]?.toLongOrNull() ?: 3600L
+            val tokenType = params["token_type"]?.ifBlank { "bearer" } ?: "bearer"
+            val user = runCatching { SupabaseProvider.client.auth.retrieveUser(accessToken) }.getOrNull()
+            SupabaseProvider.client.auth.importSession(
+                UserSession(
+                    accessToken = accessToken,
+                    refreshToken = refreshToken,
+                    expiresIn = expiresIn,
+                    tokenType = tokenType,
+                    user = user,
+                ),
+            )
+            val email = user?.email.orEmpty()
+            if (user != null && email.isNotBlank()) {
+                NetmaxAuthBridge.signIn(email, "oauth_google_${user.id}")
+            }
+            return true
+        }
+
+        val code = params["code"]
+        if (!code.isNullOrBlank()) {
+            runCatching {
+                SupabaseProvider.client.auth.exchangeCodeForSession(code)
+                val user = SupabaseProvider.client.auth.currentUserOrNull()
+                val email = user?.email.orEmpty()
+                if (user != null && email.isNotBlank()) {
+                    NetmaxAuthBridge.signIn(email, "oauth_google_${user.id}")
+                }
+            }
+            return true
+        }
+
+        return false
     }
 
     suspend fun signOut(): Result<Unit> {

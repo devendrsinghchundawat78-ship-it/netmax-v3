@@ -200,6 +200,16 @@ internal fun LazyListScope.appearanceSettingsContent(
                     onCheckedChange = onLiquidGlassNativeTabBarToggle,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
+                LiquidGlassSettingsRepository.ensureLoaded()
+                val glassSettings by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_appearance_enhanced_liquid_glass),
+                    description = stringResource(Res.string.settings_appearance_enhanced_liquid_glass_description),
+                    checked = glassSettings.enhancedLiquidGlass,
+                    isTablet = isTablet,
+                    onCheckedChange = LiquidGlassSettingsRepository::setEnhancedLiquidGlass,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_appearance_liquid_glass_controls),
                     description = stringResource(Res.string.settings_appearance_liquid_glass_controls_description),
@@ -542,6 +552,15 @@ private fun LiquidGlassControlsBottomSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+            item {
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_appearance_enhanced_liquid_glass),
+                    description = stringResource(Res.string.settings_appearance_enhanced_liquid_glass_description),
+                    checked = state.enhancedLiquidGlass,
+                    isTablet = isTablet,
+                    onCheckedChange = LiquidGlassSettingsRepository::setEnhancedLiquidGlass,
+                )
             }
             item {
                 GlassSlider(

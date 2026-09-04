@@ -413,6 +413,9 @@ kotlin {
                 implementation("androidx.recyclerview:recyclerview:1.4.0")
                 implementation("com.squareup.okhttp3:okhttp:4.12.0")
                 implementation("com.google.code.gson:gson:2.11.0")
+                implementation("org.jsoup:jsoup:1.17.2")
+                implementation("com.fasterxml.jackson.core:jackson-databind:2.15.2")
+                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2")
                 implementation("io.github.peerless2012:ass-media:0.4.0-beta01")
                 // ass-kt is only a runtime dependency of ass-media, but our code
                 // references io.github.peerless2012.ass.Ass (AssHandler.ass) for

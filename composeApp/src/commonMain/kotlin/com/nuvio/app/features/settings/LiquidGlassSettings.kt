@@ -18,6 +18,7 @@ import com.nuvio.app.core.sync.encodeSyncString
 @Stable
 data class LiquidGlassSettings(
     val enabled: Boolean = true,
+    val enhancedLiquidGlass: Boolean = false,
     val vibrancy: Float = 1f,
     val blurRadius: Float = 24f,
     val refractionHeight: Float = 0.55f,
@@ -39,6 +40,7 @@ object LiquidGlassSettingsRepository {
         loaded = true
         _uiState.value = LiquidGlassSettings(
             enabled = ThemeSettingsStorage.loadLiquidGlassEnabled() ?: true,
+            enhancedLiquidGlass = ThemeSettingsStorage.loadEnhancedLiquidGlass() ?: false,
             vibrancy = (ThemeSettingsStorage.loadLiquidGlassVibrancy() ?: 1f).coerceIn(0f, 2f),
             blurRadius = (ThemeSettingsStorage.loadLiquidGlassBlurRadius() ?: 24f).coerceIn(0f, 48f),
             refractionHeight = (ThemeSettingsStorage.loadLiquidGlassRefractionHeight() ?: 0.55f).coerceIn(0f, 1f),
@@ -62,6 +64,7 @@ object LiquidGlassSettingsRepository {
     }
 
     fun setEnabled(value: Boolean) = update { it.copy(enabled = value) }
+    fun setEnhancedLiquidGlass(value: Boolean) = update { it.copy(enhancedLiquidGlass = value) }
     fun setVibrancy(value: Float) = update { it.copy(vibrancy = value.coerceIn(0f, 2f)) }
     fun setBlurRadius(value: Float) = update { it.copy(blurRadius = value.coerceIn(0f, 48f)) }
     fun setRefractionHeight(value: Float) = update { it.copy(refractionHeight = value.coerceIn(0f, 1f)) }
@@ -80,6 +83,7 @@ object LiquidGlassSettingsRepository {
     fun exportToSyncPayload(): JsonObject = buildJsonObject {
         val state = uiState.value
         put("liquid_glass_enabled", encodeSyncBoolean(state.enabled))
+        put("enhanced_liquid_glass", encodeSyncBoolean(state.enhancedLiquidGlass))
         put("liquid_glass_vibrancy", encodeSyncFloat(state.vibrancy))
         put("liquid_glass_blur_radius", encodeSyncFloat(state.blurRadius))
         put("liquid_glass_refraction_height", encodeSyncFloat(state.refractionHeight))
@@ -93,6 +97,7 @@ object LiquidGlassSettingsRepository {
 
     fun replaceFromSyncPayload(payload: JsonObject) {
         payload.decodeSyncBoolean("liquid_glass_enabled")?.let(::setEnabled)
+        payload.decodeSyncBoolean("enhanced_liquid_glass")?.let(::setEnhancedLiquidGlass)
         payload.decodeSyncFloat("liquid_glass_vibrancy")?.let(::setVibrancy)
         payload.decodeSyncFloat("liquid_glass_blur_radius")?.let(::setBlurRadius)
         payload.decodeSyncFloat("liquid_glass_refraction_height")?.let(::setRefractionHeight)
@@ -113,6 +118,7 @@ object LiquidGlassSettingsRepository {
 
     private fun persist(state: LiquidGlassSettings) {
         ThemeSettingsStorage.saveLiquidGlassEnabled(state.enabled)
+        ThemeSettingsStorage.saveEnhancedLiquidGlass(state.enhancedLiquidGlass)
         ThemeSettingsStorage.saveLiquidGlassVibrancy(state.vibrancy)
         ThemeSettingsStorage.saveLiquidGlassBlurRadius(state.blurRadius)
         ThemeSettingsStorage.saveLiquidGlassRefractionHeight(state.refractionHeight)

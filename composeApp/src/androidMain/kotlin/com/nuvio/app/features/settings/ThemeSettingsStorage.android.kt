@@ -22,6 +22,7 @@ actual object ThemeSettingsStorage {
     private const val selectedAppLanguageKey = "selected_app_language"
     private const val NAV_BAR_STYLE_KEY = "nav_bar_style"
     private const val liquidGlassEnabledKey = "liquid_glass_enabled"
+    private const val enhancedLiquidGlassKey = "enhanced_liquid_glass"
     private const val liquidGlassVibrancyKey = "liquid_glass_vibrancy"
     private const val liquidGlassBlurRadiusKey = "liquid_glass_blur_radius"
     private const val liquidGlassRefractionHeightKey = "liquid_glass_refraction_height"
@@ -38,6 +39,7 @@ actual object ThemeSettingsStorage {
         liquidGlassNativeTabBarEnabledKey,
         NAV_BAR_STYLE_KEY,
         liquidGlassEnabledKey,
+        enhancedLiquidGlassKey,
         liquidGlassVibrancyKey,
         liquidGlassBlurRadiusKey,
         liquidGlassRefractionHeightKey,
@@ -142,6 +144,11 @@ actual object ThemeSettingsStorage {
         if (prefs.contains(key)) prefs.getBoolean(key, true) else null
     }
     actual fun saveLiquidGlassEnabled(enabled: Boolean) { preferences?.edit()?.putBoolean(ProfileScopedKey.of(liquidGlassEnabledKey), enabled)?.apply() }
+    actual fun loadEnhancedLiquidGlass(): Boolean? = preferences?.let { prefs ->
+        val key = ProfileScopedKey.of(enhancedLiquidGlassKey)
+        if (prefs.contains(key)) prefs.getBoolean(key, false) else null
+    }
+    actual fun saveEnhancedLiquidGlass(enabled: Boolean) { preferences?.edit()?.putBoolean(ProfileScopedKey.of(enhancedLiquidGlassKey), enabled)?.apply() }
     actual fun loadLiquidGlassVibrancy(): Float? = preferences?.let { prefs -> prefs.getFloat(ProfileScopedKey.of(liquidGlassVibrancyKey), Float.NaN).takeUnless { it.isNaN() } }
     actual fun saveLiquidGlassVibrancy(value: Float) { preferences?.edit()?.putFloat(ProfileScopedKey.of(liquidGlassVibrancyKey), value)?.apply() }
     actual fun loadLiquidGlassBlurRadius(): Float? = preferences?.let { prefs -> prefs.getFloat(ProfileScopedKey.of(liquidGlassBlurRadiusKey), Float.NaN).takeUnless { it.isNaN() } }

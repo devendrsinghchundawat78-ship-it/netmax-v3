@@ -2,10 +2,12 @@ package com.nuvio.app.features.plugins
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.network.SupabaseProvider
+import com.nuvio.app.features.addons.httpGetBytes
 import com.nuvio.app.features.addons.httpGetText
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.plugins.runtime.PluginRuntime
+import com.nuvio.app.features.plugins.runtime.cs3.CloudstreamPluginRuntime
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.rpc
@@ -413,14 +415,25 @@ actual object PluginRepository {
         )
 
         return runCatching {
-            PluginRuntime.executePlugin(
-                code = scraper.code,
-                tmdbId = resolvedTmdbId,
-                mediaType = normalizePluginType(mediaType),
-                season = season,
-                episode = episode,
-                scraperId = scraper.id,
-            )
+            if (scraper.formats?.contains("cs3") == true || scraper.filename.endsWith(".cs3")) {
+                CloudstreamPluginRuntime.executePlugin(
+                    code = scraper.code,
+                    tmdbId = resolvedTmdbId,
+                    mediaType = normalizePluginType(mediaType),
+                    season = season,
+                    episode = episode,
+                    scraperId = scraper.id,
+                )
+            } else {
+                PluginRuntime.executePlugin(
+                    code = scraper.code,
+                    tmdbId = resolvedTmdbId,
+                    mediaType = normalizePluginType(mediaType),
+                    season = season,
+                    episode = episode,
+                    scraperId = scraper.id,
+                )
+            }
         }
     }
 
@@ -443,8 +456,18 @@ actual object PluginRepository {
     ): Pair<PluginRepositoryItem, List<PluginScraper>> {
         val storageProfileId = currentProfileId
         return withContext(Dispatchers.Default) {
-            val payload = fetchTextWithMirrors(manifestUrl)
-            val manifest = PluginManifestParser.parse(payload)
+            var targetPayload = fetchTextWithMirrors(manifestUrl)
+            if (targetPayload.contains("\"pluginLists\"")) {
+                runCatching {
+                    val root = json.parseToJsonElement(targetPayload) as? kotlinx.serialization.json.JsonObject
+                    val list = (root?.get("pluginLists") as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }
+                    val targetUrl = list?.firstOrNull()
+                    if (!targetUrl.isNullOrBlank()) {
+                        targetPayload = fetchTextWithMirrors(targetUrl)
+                    }
+                }
+            }
+            val manifest = PluginManifestParser.parse(targetPayload)
             val baseUrls = providerBaseUrlsForManifest(manifestUrl)
             val previousForRepo = previousScrapers.values
                 .filter { it.repositoryUrl == manifestUrl }
@@ -458,6 +481,7 @@ actual object PluginRepository {
                             val scraperId = "${manifestUrl.lowercase()}:${info.id}"
                             val previous = previousForRepo[scraperId]
                             val sameVersion = previous != null && previous.version == info.version
+                            val isCs3 = info.formats?.contains("cs3") == true || info.filename.endsWith(".cs3")
                             runCatching {
                                 // Keep a working cached provider when an upstream CDN is
                                 // temporarily unavailable. Only fetch when the version
@@ -466,9 +490,9 @@ actual object PluginRepository {
                                     PluginStorage.hasScraperCode(storageProfileId, scraperId)
                                 ) {
                                     PluginStorage.loadScraperCode(storageProfileId, scraperId)
-                                        ?: fetchProviderCode(info.filename, baseUrls)
+                                        ?: fetchProviderCode(info.filename, baseUrls, isCs3)
                                 } else {
-                                    fetchProviderCode(info.filename, baseUrls)
+                                    fetchProviderCode(info.filename, baseUrls, isCs3)
                                 }
                                 if (code.isNullOrBlank()) {
                                     throw IllegalStateException("Provider code is empty: ${info.id}")
@@ -546,7 +570,28 @@ actual object PluginRepository {
             listOf(manifestUrl.substringBefore("?").removeSuffix("/manifest.json") + "/")
         }
 
-    private suspend fun fetchProviderCode(filename: String, baseUrls: List<String>): String {
+    private suspend fun fetchProviderCode(
+        filename: String,
+        baseUrls: List<String>,
+        isCs3: Boolean = false,
+    ): String {
+        if (isCs3 || filename.endsWith(".cs3")) {
+            val bytes = if (filename.startsWith("http://") || filename.startsWith("https://")) {
+                httpGetBytes(filename)
+            } else {
+                val clean = filename.trimStart('/')
+                var result: ByteArray? = null
+                for (base in baseUrls) {
+                    runCatching {
+                        result = httpGetBytes(base + clean)
+                    }
+                    if (result != null && result!!.isNotEmpty()) break
+                }
+                result ?: throw IllegalStateException("Unable to fetch CS3 binary: $filename")
+            }
+            return java.util.Base64.getEncoder().encodeToString(bytes)
+        }
+
         if (filename.startsWith("http://") || filename.startsWith("https://")) {
             return fetchTextWithMirrors(filename)
         }
@@ -728,7 +773,10 @@ actual object PluginRepository {
     private fun ensureManifestSuffix(url: String): String {
         val path = url.substringBefore("?").trimEnd('/')
         val query = url.substringAfter("?", "")
-        val withSuffix = if (path.endsWith("/manifest.json")) path else "$path/manifest.json"
+        val withSuffix = when {
+            path.endsWith("/manifest.json") || path.endsWith("/repo.json") || path.endsWith("/plugins.json") || path.endsWith(".cs3") || path.endsWith(".json") -> path
+            else -> "$path/manifest.json"
+        }
         return if (query.isEmpty()) withSuffix else "$withSuffix?$query"
     }
 
@@ -744,7 +792,10 @@ actual object PluginRepository {
         val withoutFragment = normalizedScheme.substringBefore("#")
         val query = withoutFragment.substringAfter("?", "")
         val path = withoutFragment.substringBefore("?").trimEnd('/')
-        val manifestPath = if (path.endsWith("/manifest.json")) path else "$path/manifest.json"
+        val manifestPath = when {
+            path.endsWith("/manifest.json") || path.endsWith("/repo.json") || path.endsWith("/plugins.json") || path.endsWith(".cs3") || path.endsWith(".json") -> path
+            else -> "$path/manifest.json"
+        }
         return if (query.isEmpty()) manifestPath else "$manifestPath?$query"
     }
 

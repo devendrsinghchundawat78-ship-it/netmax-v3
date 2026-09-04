@@ -34,6 +34,18 @@ object TmdbService {
         return imdbToTmdb(imdbId = normalized, mediaType = mediaType, apiKey = apiKey)
     }
 
+    suspend fun fetchMediaTitleAndYear(tmdbId: String, mediaType: String): Pair<String?, Int?>? {
+        val apiKey = currentApiKey() ?: return null
+        val normalizedType = normalizeMediaType(mediaType)
+        val numericId = ensureTmdbId(tmdbId, normalizedType)?.toIntOrNull() ?: return null
+        val endpoint = "$normalizedType/$numericId"
+        val body = fetch<TmdbMediaSummaryResponse>(endpoint = endpoint, apiKey = apiKey) ?: return null
+        val title = body.title?.takeIf { it.isNotBlank() } ?: body.name?.takeIf { it.isNotBlank() }
+        val releaseDate = body.releaseDate?.takeIf { it.isNotBlank() } ?: body.firstAirDate?.takeIf { it.isNotBlank() }
+        val year = releaseDate?.take(4)?.toIntOrNull()
+        return title to year
+    }
+
     suspend fun tmdbToImdb(tmdbId: Int, mediaType: String): String? {
         val apiKey = currentApiKey() ?: return null
 
@@ -138,6 +150,14 @@ internal fun buildTmdbUrl(
         }
     }
 }
+
+@Serializable
+private data class TmdbMediaSummaryResponse(
+    val title: String? = null,
+    val name: String? = null,
+    @SerialName("release_date") val releaseDate: String? = null,
+    @SerialName("first_air_date") val firstAirDate: String? = null,
+)
 
 @Serializable
 private data class TmdbFindResponse(

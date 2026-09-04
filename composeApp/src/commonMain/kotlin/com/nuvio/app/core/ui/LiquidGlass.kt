@@ -52,6 +52,23 @@ object LiquidGlassDefaults {
     @Composable
     fun glassBrush(isLight: Boolean, settings: LiquidGlassSettings): Brush {
         val vibrancy = (0.85f + settings.vibrancy * 0.15f).coerceIn(0.7f, 1.25f)
+        if (settings.enhancedLiquidGlass) {
+            return if (isLight) {
+                Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.40f * vibrancy),
+                        Color(0xFFF2F2F7).copy(alpha = 0.28f * vibrancy),
+                    ),
+                )
+            } else {
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF32323C).copy(alpha = 0.26f * vibrancy),
+                        Color(0xFF131318).copy(alpha = 0.38f * vibrancy),
+                    ),
+                )
+            }
+        }
         return if (isLight) {
             Brush.verticalGradient(
                 listOf(
@@ -72,18 +89,34 @@ object LiquidGlassDefaults {
     @Composable
     fun borderBrush(isLight: Boolean, settings: LiquidGlassSettings): Brush {
         val chroma = settings.chromaticAberration
-        val base = if (isLight) {
-            listOf(
-                Color.White.copy(alpha = 0.95f),
-                Color.White.copy(alpha = 0.40f),
-                Color(0xFFD0D0D8).copy(alpha = 0.25f),
-            )
+        val base = if (settings.enhancedLiquidGlass) {
+            if (isLight) {
+                listOf(
+                    Color.White.copy(alpha = 0.92f),
+                    Color.White.copy(alpha = 0.44f),
+                    Color(0xFFD8D8E0).copy(alpha = 0.28f),
+                )
+            } else {
+                listOf(
+                    Color.White.copy(alpha = 0.58f),
+                    Color.White.copy(alpha = 0.20f),
+                    Color.White.copy(alpha = 0.08f),
+                )
+            }
         } else {
-            listOf(
-                Color.White.copy(alpha = 0.48f),
-                Color.White.copy(alpha = 0.16f),
-                Color.White.copy(alpha = 0.05f),
-            )
+            if (isLight) {
+                listOf(
+                    Color.White.copy(alpha = 0.95f),
+                    Color.White.copy(alpha = 0.40f),
+                    Color(0xFFD0D0D8).copy(alpha = 0.25f),
+                )
+            } else {
+                listOf(
+                    Color.White.copy(alpha = 0.48f),
+                    Color.White.copy(alpha = 0.16f),
+                    Color.White.copy(alpha = 0.05f),
+                )
+            }
         }
         if (chroma <= 0.01f) return Brush.verticalGradient(base)
         val edge = (0.18f * chroma).coerceIn(0f, 0.18f)
@@ -101,6 +134,18 @@ object LiquidGlassDefaults {
     fun refractionBrush(settings: LiquidGlassSettings, isLight: Boolean): Brush {
         val amount = settings.refractionAmount.coerceIn(0f, 1f)
         val height = settings.refractionHeight.coerceIn(0.05f, 1f)
+        if (settings.enhancedLiquidGlass) {
+            val tint = if (isLight) Color.White else Color(0xFFF2F8FF)
+            return Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0f to tint.copy(alpha = 0.36f * amount),
+                    (height * 0.45f) to tint.copy(alpha = 0.12f * amount),
+                    height to tint.copy(alpha = 0.02f * amount),
+                    (height + 0.15f).coerceAtMost(1f) to Color.Transparent,
+                    1f to Color.Transparent,
+                ),
+            )
+        }
         val tint = if (isLight) Color.White else Color(0xFFE9F5FF)
         return Brush.verticalGradient(
             colorStops = arrayOf(
@@ -136,7 +181,17 @@ fun Modifier.liquidGlass(
     val glassBg = LiquidGlassDefaults.glassBrush(isLight, settings)
     val glassBorder = LiquidGlassDefaults.borderBrush(isLight, settings)
     val tintAlpha = (settings.surfaceOpacity * alphaFactor).coerceIn(0f, 1f)
-    val depth = (settings.depthEffect * 14f).dp
+    val depth = (settings.depthEffect * (if (settings.enhancedLiquidGlass) 18f else 14f)).dp
+    val blurRadius = if (settings.enhancedLiquidGlass) {
+        (settings.blurRadius * 1.25f).coerceAtLeast(28f).dp
+    } else {
+        settings.blurRadius.dp
+    }
+    val noise = if (settings.enhancedLiquidGlass) {
+        0.012f
+    } else {
+        (0.01f + settings.vibrancy * 0.015f).coerceIn(0.01f, 0.04f)
+    }
 
     return this
         .shadow(depth, shape, clip = false)
@@ -144,9 +199,9 @@ fun Modifier.liquidGlass(
         .then(
             if (hazeState != null) {
                 Modifier.hazeEffect(state = hazeState) {
-                    blurRadius = settings.blurRadius.dp
+                    this.blurRadius = blurRadius
                     inputScale = HazeInputScale.Fixed(0.5f)
-                    noiseFactor = (0.01f + settings.vibrancy * 0.015f).coerceIn(0.01f, 0.04f)
+                    noiseFactor = noise
                 }
             } else Modifier
         )

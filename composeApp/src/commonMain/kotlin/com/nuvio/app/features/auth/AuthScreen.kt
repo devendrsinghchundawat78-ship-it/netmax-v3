@@ -95,6 +95,7 @@ import kotlin.math.sin
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_auth_already_have_account
+import nuvio.composeapp.generated.resources.compose_auth_continue_with_google
 import nuvio.composeapp.generated.resources.compose_auth_continue_without_account
 import nuvio.composeapp.generated.resources.compose_auth_create_account
 import nuvio.composeapp.generated.resources.compose_auth_dont_have_account
@@ -110,6 +111,8 @@ import nuvio.composeapp.generated.resources.compose_auth_tagline
 import nuvio.composeapp.generated.resources.compose_auth_terms_link
 import nuvio.composeapp.generated.resources.compose_auth_terms_prefix
 import nuvio.composeapp.generated.resources.compose_auth_welcome_back
+import nuvio.composeapp.generated.resources.ic_google
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 internal val AuthTextPrimary = Color(0xFFF5F7F8)
@@ -228,6 +231,17 @@ fun AuthScreen(
         DeviceLinkAuthRepository.start()
     }
 
+    fun startGoogleSignIn() {
+        if (isLoading) return
+        DeviceLinkAuthRepository.cancel()
+        isLoading = true
+        focusManager.clearFocus(force = true)
+        scope.launch {
+            AuthRepository.signInWithGoogle()
+            isLoading = false
+        }
+    }
+
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     LaunchedEffect(serverConnectionState.activeServer.backendUrl) {
@@ -303,6 +317,7 @@ fun AuthScreen(
                         },
                         onPasswordVisibilityToggle = { passwordVisible = !passwordVisible },
                         onSubmit = ::submitAuth,
+                        onGoogleSignIn = ::startGoogleSignIn,
                         onToggleAuthMode = ::toggleAuthMode,
                         onContinueWithoutAccount = {
                             focusManager.clearFocus(force = true)
@@ -335,6 +350,7 @@ fun AuthScreen(
                         },
                         onPasswordVisibilityToggle = { passwordVisible = !passwordVisible },
                         onSubmit = ::submitAuth,
+                        onGoogleSignIn = ::startGoogleSignIn,
                         onToggleAuthMode = ::toggleAuthMode,
                         onContinueWithoutAccount = {
                             focusManager.clearFocus(force = true)
@@ -426,6 +442,7 @@ private fun AuthMobileLayout(
     onPasswordChange: (String) -> Unit,
     onPasswordVisibilityToggle: () -> Unit,
     onSubmit: () -> Unit,
+    onGoogleSignIn: () -> Unit,
     onToggleAuthMode: () -> Unit,
     onContinueWithoutAccount: () -> Unit,
     onStartDeviceLink: () -> Unit,
@@ -487,6 +504,7 @@ private fun AuthMobileLayout(
                 onPasswordChange = onPasswordChange,
                 onPasswordVisibilityToggle = onPasswordVisibilityToggle,
                 onSubmit = onSubmit,
+                onGoogleSignIn = onGoogleSignIn,
                 onToggleAuthMode = onToggleAuthMode,
                 onContinueWithoutAccount = onContinueWithoutAccount,
                 onStartDeviceLink = onStartDeviceLink,
@@ -518,6 +536,7 @@ private fun AuthLargeLayout(
     onPasswordChange: (String) -> Unit,
     onPasswordVisibilityToggle: () -> Unit,
     onSubmit: () -> Unit,
+    onGoogleSignIn: () -> Unit,
     onToggleAuthMode: () -> Unit,
     onContinueWithoutAccount: () -> Unit,
     onStartDeviceLink: () -> Unit,
@@ -617,6 +636,7 @@ private fun AuthLargeLayout(
                     onPasswordChange = onPasswordChange,
                     onPasswordVisibilityToggle = onPasswordVisibilityToggle,
                     onSubmit = onSubmit,
+                    onGoogleSignIn = onGoogleSignIn,
                     onToggleAuthMode = onToggleAuthMode,
                     onContinueWithoutAccount = onContinueWithoutAccount,
                     onStartDeviceLink = onStartDeviceLink,
@@ -706,6 +726,7 @@ private fun AuthForm(
     onPasswordChange: (String) -> Unit,
     onPasswordVisibilityToggle: () -> Unit,
     onSubmit: () -> Unit,
+    onGoogleSignIn: () -> Unit,
     onToggleAuthMode: () -> Unit,
     onContinueWithoutAccount: () -> Unit,
     onStartDeviceLink: () -> Unit,
@@ -803,6 +824,16 @@ private fun AuthForm(
 
         Spacer(modifier = Modifier.height(metrics.secondaryTop))
 
+        AuthGoogleButton(
+            isLoading = isLoading,
+            enabled = !isLoading,
+            height = metrics.secondaryHeight,
+            scale = scale,
+            onClick = onGoogleSignIn,
+        )
+
+        Spacer(modifier = Modifier.height(14.dp * scale))
+
         if (!isSignUp && deviceLinkEnabled) {
             DeviceLinkAuthSection(
                 state = deviceLinkAuthState,
@@ -837,6 +868,54 @@ private fun AuthForm(
             ),
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+@Composable
+internal fun AuthGoogleButton(
+    isLoading: Boolean,
+    enabled: Boolean,
+    height: Dp,
+    scale: Float,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(height),
+        enabled = enabled,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, AuthSecondaryButtonBorder),
+        contentPadding = PaddingValues(0.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = AuthSecondaryButtonBackground,
+            contentColor = AuthTextPrimary,
+            disabledContainerColor = AuthSecondaryButtonBackground.copy(alpha = 0.45f),
+            disabledContentColor = AuthTextPrimary.copy(alpha = 0.55f),
+        ),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                painter = painterResource(Res.drawable.ic_google),
+                contentDescription = null,
+                modifier = Modifier.size(20.dp * scale),
+                tint = Color.Unspecified,
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = stringResource(Res.string.compose_auth_continue_with_google),
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = (15f * scale).sp,
+                    lineHeight = (21f * scale).sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

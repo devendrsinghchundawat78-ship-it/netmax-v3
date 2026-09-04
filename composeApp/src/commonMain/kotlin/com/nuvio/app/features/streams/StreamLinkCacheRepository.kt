@@ -59,7 +59,7 @@ object StreamLinkCacheRepository {
         streamType: String? = null,
         contentLanguage: String? = null,
     ) {
-        if (url.isNotBlank() && url.hasLikelyExpiringPlaybackCredentials()) {
+        if (url.isNotBlank() && url.isExplicitlyExpiredUrl()) {
             remove(contentKey)
             return
         }
@@ -103,7 +103,7 @@ object StreamLinkCacheRepository {
             StreamLinkCacheStorage.removeEntry(hashedKey(contentKey))
             return null
         }
-        if (entry.url.isNotBlank() && entry.url.hasLikelyExpiringPlaybackCredentials()) {
+        if (entry.url.isNotBlank() && entry.url.isExplicitlyExpiredUrl()) {
             StreamLinkCacheStorage.removeEntry(hashedKey(contentKey))
             return null
         }

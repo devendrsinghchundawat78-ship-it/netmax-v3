@@ -20,6 +20,8 @@ internal const val DefaultRawHttpResponseMaxBytes = 1024 * 1024
 
 expect suspend fun httpGetText(url: String): String
 
+expect suspend fun httpGetBytes(url: String): ByteArray
+
 expect suspend fun httpPostJson(url: String, body: String): String
 
 expect suspend fun httpGetTextWithHeaders(

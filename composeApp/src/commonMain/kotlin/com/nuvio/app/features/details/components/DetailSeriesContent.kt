@@ -232,10 +232,17 @@ fun DetailSeriesContent(
                             onEpisodeLongPress = onEpisodeLongPress,
                         )
                     } else {
+                        var visibleListLimit by remember(seasonEpisodes) {
+                            mutableStateOf(5.coerceAtMost(seasonEpisodes.size))
+                        }
+                        val displayedEpisodes = remember(seasonEpisodes, visibleListLimit) {
+                            seasonEpisodes.take(visibleListLimit)
+                        }
+
                         Column(
                             verticalArrangement = Arrangement.spacedBy(sizing.cardGap),
                         ) {
-                            seasonEpisodes.forEach { episode ->
+                            displayedEpisodes.forEach { episode ->
                                 val episodeVideoId = buildPlaybackVideoId(
                                     parentMetaId = meta.id,
                                     seasonNumber = episode.season,
@@ -259,6 +266,27 @@ fun DetailSeriesContent(
                                     onClick = { onEpisodeClick?.invoke(episode) },
                                     onLongPress = { onEpisodeLongPress?.invoke(episode) },
                                 )
+                            }
+
+                            if (visibleListLimit < seasonEpisodes.size) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                        .clickable {
+                                            visibleListLimit = (visibleListLimit + 10).coerceAtMost(seasonEpisodes.size)
+                                        }
+                                        .padding(vertical = 10.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = "Load More Episodes (${visibleListLimit}/${seasonEpisodes.size})",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
                             }
                         }
                     }
@@ -716,6 +744,22 @@ private fun EpisodeHorizontalRow(
     val listState = rememberLazyListState()
     var hasPositioned by remember(episodes) { mutableStateOf(false) }
 
+    val initialCount = remember(episodes, preferredEpisodeNumber) {
+        val targetIdx = if (preferredEpisodeNumber != null) {
+            episodes.indexOfFirst { it.episode == preferredEpisodeNumber }.coerceAtLeast(0)
+        } else 0
+        (targetIdx + 5).coerceIn(5, episodes.size)
+    }
+    var visibleLimit by remember(episodes) { mutableStateOf(initialCount) }
+
+    LaunchedEffect(listState.firstVisibleItemIndex, episodes.size) {
+        val layoutInfo = listState.layoutInfo
+        val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: listState.firstVisibleItemIndex
+        if (lastVisibleItemIndex >= visibleLimit - 2 && visibleLimit < episodes.size) {
+            visibleLimit = (visibleLimit + 5).coerceAtMost(episodes.size)
+        }
+    }
+
     LaunchedEffect(episodes, preferredEpisodeNumber) {
         val targetIndex = if (preferredEpisodeNumber != null) {
             episodes.indexOfFirst { it.episode == preferredEpisodeNumber }
@@ -723,6 +767,7 @@ private fun EpisodeHorizontalRow(
             -1
         }
         if (targetIndex >= 0) {
+            visibleLimit = (targetIndex + 5).coerceIn(5, episodes.size)
             if (hasPositioned) {
                 listState.animateScrollToItem(targetIndex)
             } else {
@@ -730,6 +775,10 @@ private fun EpisodeHorizontalRow(
                 hasPositioned = true
             }
         }
+    }
+
+    val visibleEpisodes = remember(episodes, visibleLimit) {
+        episodes.take(visibleLimit)
     }
 
     LazyRow(
@@ -744,7 +793,7 @@ private fun EpisodeHorizontalRow(
         horizontalArrangement = Arrangement.spacedBy(rowMetrics.itemSpacing),
     ) {
         itemsIndexed(
-            items = episodes,
+            items = visibleEpisodes,
             key = { index, episode -> "${episode.season}:${episode.episode}:${episode.id}#$index" },
         ) { _, episode ->
             val episodeVideoId = buildPlaybackVideoId(
@@ -1479,18 +1528,20 @@ private fun seriesContentSizing(maxWidthDp: Float): SeriesContentSizing =
         )
     }
 
+@Composable
 private fun Int.label(): String =
     if (this <= 0) {
-        runBlocking { getString(Res.string.episodes_specials) }
+        stringResource(Res.string.episodes_specials)
     } else {
-        runBlocking { getString(Res.string.episodes_season, this@label) }
+        stringResource(Res.string.episodes_season, this)
     }
 
+@Composable
 private fun MetaVideo.episodeBadge(): String =
     when {
         episode != null || season != null ->
             localizedSeasonEpisodeCode(seasonNumber = season, episodeNumber = episode).orEmpty()
-        else -> runBlocking { getString(Res.string.details_episode_badge_file) }
+        else -> stringResource(Res.string.details_episode_badge_file)
     }
 
 private fun MetaVideo.seasonEpisodeKey(): Pair<Int, Int>? {

@@ -433,16 +433,8 @@ private fun CenterControls(
     hazeState: dev.chrisbanes.haze.HazeState? = null,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier
-            .liquidGlass(
-                shape = LiquidGlassDefaults.PillShape,
-                hazeState = hazeState,
-                borderWidth = 1.dp,
-            )
-            .padding(horizontal = 8.dp, vertical = 5.dp),
-    ) {
     Row(
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(metrics.centerGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -450,21 +442,23 @@ private fun CenterControls(
             icon = Icons.Rounded.Replay10,
             contentDescription = stringResource(Res.string.compose_player_seek_back_10),
             metrics = metrics,
+            hazeState = hazeState,
             onClick = onSeekBack,
         )
         PlayPauseControlButton(
             isPlaying = snapshot.isPlaying,
             isBuffering = snapshot.isLoading,
             metrics = metrics,
+            hazeState = hazeState,
             onClick = onTogglePlayback,
         )
         SideControlButton(
             icon = Icons.Rounded.Forward10,
             contentDescription = stringResource(Res.string.compose_player_seek_forward_10),
             metrics = metrics,
+            hazeState = hazeState,
             onClick = onSeekForward,
         )
-    }
     }
 }
 
@@ -473,10 +467,18 @@ private fun SideControlButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
     metrics: PlayerLayoutMetrics,
+    hazeState: dev.chrisbanes.haze.HazeState? = null,
     onClick: () -> Unit,
 ) {
+    LiquidGlassSettingsRepository.ensureLoaded()
+    val glassTextColor by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
     Box(
         modifier = Modifier
+            .liquidGlass(
+                shape = CircleShape,
+                hazeState = hazeState,
+                borderWidth = 1.dp,
+            )
             .clip(CircleShape)
             .clickable(onClick = onClick)
             .padding(metrics.sideButtonPadding),
@@ -485,8 +487,8 @@ private fun SideControlButton(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = Color.White,
-            modifier = Modifier.size(metrics.playIconSize),
+            tint = glassTextColor.textColor,
+            modifier = Modifier.size(metrics.sideIconSize),
         )
     }
 }
@@ -496,14 +498,22 @@ private fun PlayPauseControlButton(
     isPlaying: Boolean,
     isBuffering: Boolean,
     metrics: PlayerLayoutMetrics,
+    hazeState: dev.chrisbanes.haze.HazeState? = null,
     onClick: () -> Unit,
 ) {
+    LiquidGlassSettingsRepository.ensureLoaded()
+    val glassTextColor by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
     val playPausePainter = appIconPainter(
         if (isPlaying) AppIconResource.PlayerPause else AppIconResource.PlayerPlay,
     )
 
     Box(
         modifier = Modifier
+            .liquidGlass(
+                shape = CircleShape,
+                hazeState = hazeState,
+                borderWidth = 1.dp,
+            )
             .clip(CircleShape)
             .clickable(onClick = onClick)
             .padding(metrics.playButtonPadding),
@@ -511,7 +521,7 @@ private fun PlayPauseControlButton(
     ) {
         if (isBuffering) {
             NuvioLoadingIndicator(
-                color = Color.White,
+                color = glassTextColor.textColor,
                 modifier = Modifier.size(metrics.playIconSize),
             )
         } else {
@@ -522,7 +532,7 @@ private fun PlayPauseControlButton(
                 } else {
                     stringResource(Res.string.detail_btn_play)
                 },
-                tint = Color.White,
+                tint = glassTextColor.textColor,
                 modifier = Modifier.size(metrics.playIconSize),
             )
         }

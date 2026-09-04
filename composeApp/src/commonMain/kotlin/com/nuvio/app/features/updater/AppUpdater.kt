@@ -98,21 +98,26 @@ private object VersionUtils {
     }
 
     fun isRemoteNewer(remote: String?, local: String?): Boolean {
-        val remoteParts = parseVersionParts(remote)
-        val localParts = parseVersionParts(local)
+        val remoteParts = parseVersionParts(remote) ?: return false
+        val localParts = parseVersionParts(local) ?: return false
 
-        if (remoteParts == null || localParts == null) {
-            val remoteValue = normalize(remote)
-            val localValue = normalize(local)
-            return remoteValue.isNotBlank() && localValue.isNotBlank() && remoteValue != localValue
-        }
-
-        val maxSize = maxOf(remoteParts.size, localParts.size)
-        for (index in 0 until maxSize) {
+        val maxSemverSize = minOf(3, maxOf(remoteParts.size, localParts.size))
+        for (index in 0 until maxSemverSize) {
             val remoteValue = remoteParts.getOrElse(index) { 0 }
             val localValue = localParts.getOrElse(index) { 0 }
-            if (remoteValue != localValue) return remoteValue > localValue
+            if (remoteValue != localValue) {
+                return remoteValue > localValue
+            }
         }
+
+        // If major.minor.patch are identical:
+        // Only compare build numbers if BOTH remote and local explicitly specified a build number (> 3 parts)
+        if (remoteParts.size > 3 && localParts.size > 3) {
+            val remoteBuild = remoteParts[3]
+            val localBuild = localParts[3]
+            return remoteBuild > localBuild
+        }
+
         return false
     }
 }

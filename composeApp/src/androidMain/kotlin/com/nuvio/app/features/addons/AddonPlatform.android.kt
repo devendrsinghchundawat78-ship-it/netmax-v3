@@ -224,6 +224,16 @@ actual suspend fun httpGetText(url: String): String =
         headers = mapOf("Accept" to "application/json"),
     )
 
+actual suspend fun httpGetBytes(url: String): ByteArray = withContext(Dispatchers.IO) {
+    val request = Request.Builder().url(url).build()
+    AddonHttpClientProvider.get().newCall(request).execute().use { response ->
+        if (!response.isSuccessful) {
+            error(runBlocking { getString(Res.string.network_request_failed_http, response.code) })
+        }
+        response.body?.bytes() ?: ByteArray(0)
+    }
+}
+
 actual suspend fun httpPostJson(url: String, body: String): String =
     executeTextRequest(
         method = "POST",

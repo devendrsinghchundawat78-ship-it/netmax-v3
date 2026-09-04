@@ -342,6 +342,7 @@
     <string name="compose_action_reload">Reload</string>
     <string name="compose_auth_already_have_account">Already have an account? </string>
     <string name="compose_auth_continue_without_account">Continue Without Account</string>
+    <string name="compose_auth_continue_with_google">Continue with Google</string>
     <string name="compose_auth_create_account">Create Account</string>
     <string name="compose_auth_dont_have_account">Don't have an account? </string>
     <string name="compose_auth_email">Email</string>
@@ -682,6 +683,8 @@
     <string name="settings_appearance_continue_watching_description">Settings for the Continue Watching section.</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass (Beta)</string>
     <string name="settings_appearance_liquid_glass_description">Real-time liquid glass blur, specular highlights, and translucent refraction styling across navigation and headers.</string>
+    <string name="settings_appearance_enhanced_liquid_glass">Enhanced Liquid Glass</string>
+    <string name="settings_appearance_enhanced_liquid_glass_description">Enable iOS-style ultra-clear, specular, transparent liquid glass across screens and popups.</string>
     <string name="settings_appearance_liquid_glass_controls">Liquid Glass Controls</string>
     <string name="settings_appearance_liquid_glass_controls_description">Tune blur, vibrancy, refraction, depth, tint, and glass text.</string>
     <string name="settings_appearance_liquid_glass_controls_hint">These controls apply to the main glass surfaces only. Small utility buttons keep their normal style.</string>

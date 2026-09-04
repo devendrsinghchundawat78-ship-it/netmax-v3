@@ -26,6 +26,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.features.settings.LiquidGlassSettingsRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,11 +43,20 @@ fun NuvioModalBottomSheet(
     fullHeight: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    LiquidGlassSettingsRepository.ensureLoaded()
+    val glassSettings by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
+    val isEnhanced = glassSettings.enabled && glassSettings.enhancedLiquidGlass
+    val effectiveContainerColor = if (isEnhanced && containerColor == MaterialTheme.nuvio.colors.surfaceSheet) {
+        containerColor.copy(alpha = 0.82f)
+    } else {
+        containerColor
+    }
+
     if (usesNativeNuvioBottomSheet) {
         NuvioNativeModalBottomSheet(
             onDismissRequest = onDismissRequest,
             modifier = modifier,
-            containerColor = containerColor,
+            containerColor = effectiveContainerColor,
             contentColor = contentColor,
             showDragHandle = showDragHandle,
             fullHeight = fullHeight,
@@ -55,7 +67,7 @@ fun NuvioModalBottomSheet(
             onDismissRequest = onDismissRequest,
             sheetState = sheetState,
             modifier = modifier,
-            containerColor = containerColor,
+            containerColor = effectiveContainerColor,
             contentColor = contentColor,
             shape = shape,
             dragHandle = if (showDragHandle) {

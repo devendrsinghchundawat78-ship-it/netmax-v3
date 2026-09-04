@@ -96,6 +96,8 @@ actual suspend fun httpGetText(url: String): String =
             payload
         }
 
+actual suspend fun httpGetBytes(url: String): ByteArray = ByteArray(0)
+
 actual suspend fun httpPostJson(url: String, body: String): String =
     addonHttpClient
         .post(url) {

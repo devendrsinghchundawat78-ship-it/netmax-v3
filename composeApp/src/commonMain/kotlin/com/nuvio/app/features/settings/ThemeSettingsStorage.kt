@@ -18,6 +18,8 @@ internal expect object ThemeSettingsStorage {
     fun saveNavBarStyle(styleKey: String)
     fun loadLiquidGlassEnabled(): Boolean?
     fun saveLiquidGlassEnabled(enabled: Boolean)
+    fun loadEnhancedLiquidGlass(): Boolean?
+    fun saveEnhancedLiquidGlass(enabled: Boolean)
     fun loadLiquidGlassVibrancy(): Float?
     fun saveLiquidGlassVibrancy(value: Float)
     fun loadLiquidGlassBlurRadius(): Float?
