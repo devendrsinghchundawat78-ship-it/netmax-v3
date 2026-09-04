@@ -2179,6 +2179,7 @@ private data class TmdbEpisodeResponse(
     @SerialName("air_date") val airDate: String? = null,
     val runtime: Int? = null,
     @SerialName("episode_number") val episodeNumber: Int? = null,
+    @SerialName("vote_average") val voteAverage: Double? = null,
 )
 
 // ─── Person Detail Models ───

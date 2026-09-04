@@ -95,7 +95,7 @@ private data class ChatLine(
 fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val authState by AuthRepository.state.collectAsStateWithLifecycle()
     val liquidGlassEnabled by ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.collectAsStateWithLifecycle()
-    val appTheme by ThemeSettingsRepository.theme.collectAsStateWithLifecycle()
+    val appTheme by ThemeSettingsRepository.selectedTheme.collectAsStateWithLifecycle()
     val themePalette = remember(appTheme) { ThemeColors.getColorPalette(appTheme) }
 
     val messages = remember { mutableStateListOf<ChatLine>() }

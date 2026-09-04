@@ -13,7 +13,7 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.ZipFile
 
-actual object CloudstreamPluginLoader {
+object CloudstreamPluginLoader {
     private val log = Logger.withTag("CS3PluginLoader")
     private val loadedApis = ConcurrentHashMap<String, MainAPI>()
     private var pluginCacheDir: File? = null
@@ -22,7 +22,7 @@ actual object CloudstreamPluginLoader {
         pluginCacheDir = File(cacheDir, "cs3_plugins").apply { mkdirs() }
     }
 
-    actual suspend fun loadApi(scraperId: String, cs3Data: ByteArray): MainAPI? = withContext(Dispatchers.IO) {
+    suspend fun loadApi(scraperId: String, cs3Data: ByteArray): MainAPI? = withContext(Dispatchers.IO) {
         loadedApis[scraperId]?.let { return@withContext it }
 
         if (cs3Data.isEmpty()) return@withContext null
@@ -115,7 +115,7 @@ actual object CloudstreamPluginLoader {
         }
     }
 
-    actual fun clearCache() {
+    fun clearCache() {
         loadedApis.clear()
     }
 }
