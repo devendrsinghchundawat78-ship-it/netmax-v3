@@ -165,9 +165,18 @@ object AuthRepository {
         if (!url.startsWith("nuvio://", ignoreCase = true)) return false
         val fragment = url.substringAfter('#', missingDelimiterValue = "")
         val query = url.substringAfter('?', missingDelimiterValue = "").substringBefore('#')
-        val params = (fragment.ifBlank { query }).split('&').associate {
+        val rawParams = fragment.ifBlank { query }
+        if (rawParams.isBlank()) return false
+
+        val params = rawParams.split('&').associate {
             val parts = it.split('=', limit = 2)
             parts[0].trim().lowercase() to (parts.getOrNull(1)?.trim().orEmpty())
+        }
+
+        val errorDescription = params["error_description"] ?: params["error"]
+        if (!errorDescription.isNullOrBlank()) {
+            _error.value = errorDescription.replace('+', ' ')
+            return true
         }
 
         val accessToken = params["access_token"]

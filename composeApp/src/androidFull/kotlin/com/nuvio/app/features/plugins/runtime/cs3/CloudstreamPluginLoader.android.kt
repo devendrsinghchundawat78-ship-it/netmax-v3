@@ -64,7 +64,7 @@ object CloudstreamPluginLoader {
                     val cls = dexClassLoader.loadClass(pluginClassName)
                     if (BasePlugin::class.java.isAssignableFrom(cls)) {
                         val pluginInstance = cls.getDeclaredConstructor().newInstance() as BasePlugin
-                        pluginInstance.load()
+                        invokePluginLoad(cls, pluginInstance)
                         api = pluginInstance.registeredApis.firstOrNull()
                     } else if (MainAPI::class.java.isAssignableFrom(cls)) {
                         api = cls.getDeclaredConstructor().newInstance() as MainAPI
@@ -86,7 +86,7 @@ object CloudstreamPluginLoader {
                                         val cls = dexClassLoader.loadClass(className)
                                         if (BasePlugin::class.java.isAssignableFrom(cls) && !cls.isInterface) {
                                             val instance = cls.getDeclaredConstructor().newInstance() as BasePlugin
-                                            instance.load()
+                                            invokePluginLoad(cls, instance)
                                             if (instance.registeredApis.isNotEmpty()) {
                                                 api = instance.registeredApis.firstOrNull()
                                             }
@@ -112,6 +112,21 @@ object CloudstreamPluginLoader {
         } catch (e: Throwable) {
             log.e(e) { "Failed to load CloudStream plugin $scraperId" }
             null
+        }
+    }
+
+    private fun invokePluginLoad(cls: Class<*>, instance: BasePlugin) {
+        val loadWithArg = cls.methods.firstOrNull { it.name == "load" && it.parameterTypes.size == 1 }
+        if (loadWithArg != null) {
+            val appCtx = runCatching {
+                val threadCls = Class.forName("android.app.ActivityThread")
+                val method = threadCls.getMethod("currentApplication")
+                method.invoke(null)
+            }.getOrNull()
+            runCatching { loadWithArg.invoke(instance, appCtx) }
+                .onFailure { runCatching { instance.load() } }
+        } else {
+            instance.load()
         }
     }
 
