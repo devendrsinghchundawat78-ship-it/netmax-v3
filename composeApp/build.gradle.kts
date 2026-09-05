@@ -416,6 +416,7 @@ kotlin {
                 implementation("org.jsoup:jsoup:1.17.2")
                 implementation("com.fasterxml.jackson.core:jackson-databind:2.15.2")
                 implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2")
+                implementation("org.jetbrains.kotlin:kotlin-reflect:${libs.versions.kotlin.get()}")
                 implementation("io.github.peerless2012:ass-media:0.4.0-beta01")
                 // ass-kt is only a runtime dependency of ass-media, but our code
                 // references io.github.peerless2012.ass.Ass (AssHandler.ass) for

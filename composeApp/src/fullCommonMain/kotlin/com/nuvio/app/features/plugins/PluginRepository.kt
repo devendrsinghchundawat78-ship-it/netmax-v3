@@ -462,7 +462,9 @@ actual object PluginRepository {
             if (targetPayload.contains("\"pluginLists\"")) {
                 runCatching {
                     val root = json.parseToJsonElement(targetPayload) as? kotlinx.serialization.json.JsonObject
-                    val list = (root?.get("pluginLists") as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }
+                    val list = (root?.get("pluginLists") as? kotlinx.serialization.json.JsonArray)?.mapNotNull {
+                        (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+                    }
                     val targetUrl = list?.firstOrNull()
                     if (!targetUrl.isNullOrBlank()) {
                         targetPayload = fetchTextWithMirrors(targetUrl)

@@ -62,3 +62,18 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# CloudStream 3 runtime, extensions, reflection and serializers
+-keep class com.lagradost.** { *; }
+-keep interface com.lagradost.** { *; }
+-dontwarn com.lagradost.**
+
+-keep class org.jsoup.** { *; }
+-dontwarn org.jsoup.**
+
+-keep class com.fasterxml.jackson.** { *; }
+-dontwarn com.fasterxml.jackson.**
+
+-keep class kotlin.reflect.** { *; }
+-dontwarn kotlin.reflect.**
+

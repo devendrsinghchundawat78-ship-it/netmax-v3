@@ -30,8 +30,16 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 
-val defaultMapper: ObjectMapper = jacksonObjectMapper().apply {
-    configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+val defaultMapper: ObjectMapper by lazy {
+    runCatching {
+        jacksonObjectMapper().apply {
+            configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+        }
+    }.getOrElse {
+        ObjectMapper().apply {
+            configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+        }
+    }
 }
 
 interface ResponseParser {
@@ -42,7 +50,9 @@ interface ResponseParser {
     fun writeValueAsString(obj: Any): String
 }
 
-class DefaultResponseParser(override val mapper: ObjectMapper = defaultMapper) : ResponseParser {
+class DefaultResponseParser(private val _mapper: ObjectMapper? = null) : ResponseParser {
+    override val mapper: ObjectMapper
+        get() = _mapper ?: defaultMapper
     override fun <T : Any> parse(text: String, kClass: KClass<T>): T {
         return mapper.readValue(text, kClass.java)
     }

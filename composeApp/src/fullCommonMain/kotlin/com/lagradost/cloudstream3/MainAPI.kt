@@ -7,10 +7,14 @@ import com.lagradost.cloudstream3.utils.AppUtils
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import java.util.EnumSet
 
-val mapper: JsonMapper = JsonMapper.builder()
-    .addModule(kotlinModule())
-    .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-    .build()
+val mapper: JsonMapper by lazy {
+    val builder = JsonMapper.builder()
+        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    runCatching {
+        builder.addModule(kotlinModule())
+    }
+    builder.build()
+}
 
 abstract class MainAPI {
     open var name: String = "Unnamed"

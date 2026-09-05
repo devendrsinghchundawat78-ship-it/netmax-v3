@@ -10,8 +10,16 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 
 object AppUtils {
-    val mapper: ObjectMapper = jacksonObjectMapper().apply {
-        configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    val mapper: ObjectMapper by lazy {
+        runCatching {
+            jacksonObjectMapper().apply {
+                configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            }
+        }.getOrElse {
+            ObjectMapper().apply {
+                configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            }
+        }
     }
 
     inline fun <reified T> parseJson(text: String): T = mapper.readValue(text)

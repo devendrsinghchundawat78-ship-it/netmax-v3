@@ -95,10 +95,7 @@ object SupabaseProvider {
                     headers.append(HttpHeaders.UserAgent, userAgent)
                 }
             }
-            install(Auth) {
-                scheme = "nuvio"
-                host = "auth"
-            }
+            install(Auth)
             install(Postgrest)
             install(Functions)
             install(Storage)
