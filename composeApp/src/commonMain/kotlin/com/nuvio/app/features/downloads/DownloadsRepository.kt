@@ -532,10 +532,12 @@ private fun String.fileExtensionFromUrl(): String {
         .lowercase()
         .trim()
 
-    return if (suffix.length in 2..5 && suffix.all { it.isLetterOrDigit() }) {
+    val mapped = if (suffix.length in 2..5 && suffix.all { it.isLetterOrDigit() }) {
         suffix
     } else {
         "mp4"
     }
+    // HLS playlists are saved as a single concatenated transport-stream file.
+    return if (mapped == "m3u8") "ts" else mapped
 }
 

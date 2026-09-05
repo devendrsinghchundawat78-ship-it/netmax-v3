@@ -14,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.download_failed
 import nuvio.composeapp.generated.resources.downloads_error_finalize_file_failed
+import nuvio.composeapp.generated.resources.downloads_error_hls_unsupported
 import nuvio.composeapp.generated.resources.downloads_error_open_partial_file_failed
 import nuvio.composeapp.generated.resources.downloads_error_partial_file_not_open
 import nuvio.composeapp.generated.resources.downloads_error_write_partial_file_failed
@@ -83,6 +84,14 @@ internal actual object DownloadsPlatformDownloader {
             val tempPath = "$downloadsDirectory/${request.destinationFileName}.part"
 
             try {
+                // HLS playlists are accepted by the shared filter but only the
+                // Android engine can fetch segment streams today. Fail fast with a
+                // clear message instead of saving an unplayable playlist file.
+                if (request.sourceUrl.isHlsPlaylistUrl()) {
+                    onFailure(runBlocking { getString(Res.string.downloads_error_hls_unsupported) })
+                    return@launch
+                }
+
                 var resumeFromBytes = fileSizeOrNull(tempPath)?.coerceAtLeast(0L) ?: 0L
 
                 var attemptedRangeRequest = resumeFromBytes > 0L

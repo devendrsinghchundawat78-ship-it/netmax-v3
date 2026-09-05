@@ -77,3 +77,17 @@
 -keep class kotlin.reflect.** { *; }
 -dontwarn kotlin.reflect.**
 
+# Coil 3 SVG engine (AndroidSVG) - decodes remote SVG artwork such as the
+# Torbox/Premiumize provider logos. Keep it intact for release (R8) builds.
+-keep class com.caverock.androidsvg.** { *; }
+-dontwarn com.caverock.androidsvg.**
+
+# ASS subtitle parsing (peerless2012 ass-media / ass-kt) used by the player
+# for imported subtitle fonts.
+-keep class io.github.peerless2012.** { *; }
+-dontwarn io.github.peerless2012.**
+
+# KSoup HTML parser used by the plugin scrapers.
+-keep class com.fleeksoft.ksoup.** { *; }
+-dontwarn com.fleeksoft.ksoup.**
+

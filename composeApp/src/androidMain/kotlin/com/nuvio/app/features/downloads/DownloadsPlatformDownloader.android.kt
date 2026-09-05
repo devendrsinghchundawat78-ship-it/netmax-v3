@@ -12,14 +12,19 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.Call
+import okhttp3.Headers
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URI
 import java.util.concurrent.TimeUnit
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 private const val DEFAULT_DOWNLOAD_USER_AGENT = "Mozilla/5.0 (Android) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36"
 
@@ -60,6 +65,20 @@ internal actual object DownloadsPlatformDownloader {
             val tempFile = File(downloadsDir, "${request.destinationFileName}.part")
 
             try {
+                if (request.sourceUrl.isHlsPlaylistUrl()) {
+                    downloadHlsPlaylist(
+                        playlistUrl = request.sourceUrl,
+                        downloadsDir = downloadsDir,
+                        destination = destination,
+                        tempFile = tempFile,
+                        headers = buildDownloadHeaders(request.sourceHeaders),
+                        onProgress = onProgress,
+                        onSuccess = onSuccess,
+                        registerCall = { call = it },
+                    )
+                    return@launch
+                }
+
                 var resumeFromBytes = tempFile.takeIf { it.exists() }?.length()?.coerceAtLeast(0L) ?: 0L
 
                 fun buildRequest(rangeStart: Long?): Request {
@@ -279,4 +298,366 @@ private fun parseContentRangeTotal(headerValue: String?): Long? {
     val totalPart = value.substring(slashIndex + 1).trim()
     if (totalPart == "*") return null
     return totalPart.toLongOrNull()?.takeIf { it > 0L }
+}
+
+private const val HLS_MAX_PLAYLIST_BYTES = 5L * 1024 * 1024
+private const val HLS_MAX_SEGMENT_BYTES = 256L * 1024 * 1024
+private const val HLS_MAX_SEGMENTS = 8000
+
+private data class HlsKey(
+    val method: String,
+    val uri: String?,
+    val iv: ByteArray?,
+)
+
+private data class HlsSegment(
+    val uri: String,
+    val rangeStart: Long?,
+    val rangeLength: Long?,
+    val key: HlsKey?,
+    val sequence: Long,
+) {
+    fun rangeEndInclusive(): Long? =
+        if (rangeStart != null && rangeLength != null && rangeLength > 0L) {
+            rangeStart + rangeLength - 1L
+        } else {
+            null
+        }
+}
+
+private data class HlsParsedMedia(
+    val initSegmentUri: String?,
+    val segments: List<HlsSegment>,
+    val sawEndList: Boolean,
+    val isFmp4: Boolean,
+)
+
+private fun buildDownloadHeaders(sourceHeaders: Map<String, String>): Headers {
+    val builder = Headers.Builder()
+    val userAgent = sourceHeaders.entries.firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }?.value
+    val accept = sourceHeaders.entries.firstOrNull { it.key.equals("Accept", ignoreCase = true) }?.value
+    builder["User-Agent"] = userAgent ?: DEFAULT_DOWNLOAD_USER_AGENT
+    builder["Accept"] = accept ?: "video/*,application/octet-stream,*/*;q=0.8"
+    builder["Accept-Encoding"] = "identity"
+    sourceHeaders.forEach { (key, value) ->
+        if (!key.equals("User-Agent", ignoreCase = true) &&
+            !key.equals("Accept", ignoreCase = true) &&
+            !key.equals("Accept-Encoding", ignoreCase = true)
+        ) {
+            builder[key] = value
+        }
+    }
+    return builder.build()
+}
+
+/**
+ * Downloads an HLS (`.m3u8`) stream into a single local file: master playlists
+ * resolve to the highest-bandwidth variant, then the init segment (if any) and
+ * every media segment are fetched sequentially and concatenated. AES-128
+ * encrypted segments are decrypted; other encryption schemes fail with a clear
+ * message instead of producing an unplayable file.
+ */
+private suspend fun downloadHlsPlaylist(
+    playlistUrl: String,
+    downloadsDir: File,
+    destination: File,
+    tempFile: File,
+    headers: Headers,
+    onProgress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
+    onSuccess: (localFileUri: String, totalBytes: Long?) -> Unit,
+    registerCall: (Call?) -> Unit,
+) {
+    // HLS downloads always restart from scratch: a partial segment stream
+    // cannot be resumed by byte range.
+    if (tempFile.exists()) {
+        tempFile.delete()
+    }
+
+    val playlistText = fetchHlsText(playlistUrl, headers, registerCall)
+        ?: error(runBlocking { getString(Res.string.downloads_error_hls_playlist) })
+
+    var mediaPlaylistUrl = playlistUrl
+    var mediaPlaylistText = playlistText
+    val variants = parseHlsMasterVariants(playlistUrl, playlistText)
+    if (variants.isNotEmpty()) {
+        val best = variants.maxByOrNull { it.bandwidth } ?: variants.first()
+        mediaPlaylistUrl = best.uri
+        mediaPlaylistText = fetchHlsText(best.uri, headers, registerCall)
+            ?: error(runBlocking { getString(Res.string.downloads_error_hls_playlist) })
+    }
+
+    val parsed = parseHlsMediaPlaylist(mediaPlaylistUrl, mediaPlaylistText)
+    if (!parsed.sawEndList) {
+        error(runBlocking { getString(Res.string.downloads_error_hls_live) })
+    }
+    if (parsed.segments.isEmpty() && parsed.initSegmentUri == null) {
+        error(runBlocking { getString(Res.string.downloads_error_hls_segments) })
+    }
+    val segments = parsed.segments.take(HLS_MAX_SEGMENTS)
+
+    val finalDestination = if (parsed.isFmp4 && !destination.name.endsWith(".mp4", ignoreCase = true)) {
+        File(downloadsDir, destination.nameWithoutExtension + ".mp4")
+    } else {
+        destination
+    }
+
+    val keyCache = mutableMapOf<String, ByteArray>()
+    var downloadedBytes = 0L
+    onProgress(0L, null)
+
+    FileOutputStream(tempFile, false).use { output ->
+        parsed.initSegmentUri?.let { initUri ->
+            coroutineContext.ensureActive()
+            val bytes = fetchHlsBytes(initUri, headers, null, null, registerCall)
+                ?: error(runBlocking { getString(Res.string.downloads_error_hls_playlist) })
+            output.write(bytes)
+            downloadedBytes += bytes.size.toLong()
+            onProgress(downloadedBytes, null)
+        }
+        for (segment in segments) {
+            coroutineContext.ensureActive()
+            val key = segment.key
+            if (key != null && key.method != "NONE" && key.method != "AES-128") {
+                error(runBlocking { getString(Res.string.downloads_error_hls_encrypted) })
+            }
+            var bytes = fetchHlsBytes(segment.uri, headers, segment.rangeStart, segment.rangeEndInclusive(), registerCall)
+                ?: error(runBlocking { getString(Res.string.downloads_error_hls_playlist) })
+            if (key != null && key.method == "AES-128") {
+                val keyUri = key.uri
+                    ?: error(runBlocking { getString(Res.string.downloads_error_hls_encrypted) })
+                val keyBytes = keyCache.getOrPut(keyUri) {
+                    fetchHlsBytes(keyUri, headers, null, null, registerCall)?.takeIf { it.size == 16 }
+                        ?: error(runBlocking { getString(Res.string.downloads_error_hls_encrypted) })
+                }
+                if (bytes.size % 16 != 0) {
+                    error(runBlocking { getString(Res.string.downloads_error_hls_encrypted) })
+                }
+                val iv = key.iv ?: hlsSequenceIv(segment.sequence)
+                bytes = runCatching { aes128CbcDecrypt(keyBytes, iv, bytes) }.getOrElse {
+                    error(runBlocking { getString(Res.string.downloads_error_hls_encrypted) })
+                }
+            }
+            output.write(bytes)
+            downloadedBytes += bytes.size.toLong()
+            onProgress(downloadedBytes, null)
+        }
+        output.flush()
+    }
+
+    if (destination != finalDestination && destination.exists()) {
+        destination.delete()
+    }
+    if (finalDestination.exists()) {
+        finalDestination.delete()
+    }
+    if (!tempFile.renameTo(finalDestination)) {
+        tempFile.copyTo(finalDestination, overwrite = true)
+        tempFile.delete()
+    }
+
+    val finalSize = finalDestination.length()
+    onSuccess(finalDestination.toURI().toString(), finalSize)
+}
+
+private fun fetchHlsText(
+    url: String,
+    headers: Headers,
+    registerCall: (Call?) -> Unit,
+): String? {
+    val call = downloadHttpClient.newCall(Request.Builder().url(url).headers(headers).get().build())
+    registerCall(call)
+    call.execute().use { response ->
+        if (!response.isSuccessful) return null
+        val body = response.body ?: return null
+        val bytes = body.byteStream().use { it.readCapped(HLS_MAX_PLAYLIST_BYTES) }
+        return bytes.toString(Charsets.UTF_8).takeIf { it.contains("#EXTM3U") }
+    }
+}
+
+private fun fetchHlsBytes(
+    url: String,
+    headers: Headers,
+    rangeStart: Long?,
+    rangeEndInclusive: Long?,
+    registerCall: (Call?) -> Unit,
+): ByteArray? {
+    val builder = Request.Builder().url(url).headers(headers)
+    if (rangeStart != null && rangeStart >= 0L) {
+        val end = rangeEndInclusive?.let { "-$it" } ?: "-"
+        builder.header("Range", "bytes=$rangeStart$end")
+    }
+    val call = downloadHttpClient.newCall(builder.get().build())
+    registerCall(call)
+    call.execute().use { response ->
+        if (!response.isSuccessful) return null
+        val body = response.body ?: return null
+        return body.byteStream().use { it.readCapped(HLS_MAX_SEGMENT_BYTES) }
+    }
+}
+
+private fun java.io.InputStream.readCapped(maxBytes: Long): ByteArray {
+    val out = ByteArrayOutputStream()
+    val buffer = ByteArray(16 * 1024)
+    var total = 0L
+    while (true) {
+        val read = read(buffer)
+        if (read <= 0) break
+        total += read
+        if (total > maxBytes) error("Response exceeded ${maxBytes} bytes")
+        out.write(buffer, 0, read)
+    }
+    return out.toByteArray()
+}
+
+private data class HlsVariant(val bandwidth: Long, val uri: String)
+
+private fun parseHlsMasterVariants(baseUrl: String, text: String): List<HlsVariant> {
+    val variants = mutableListOf<HlsVariant>()
+    var pendingBandwidth = 0L
+    var expectUri = false
+    for (rawLine in text.lineSequence()) {
+        val line = rawLine.trim()
+        when {
+            line.startsWith("#EXT-X-STREAM-INF:") -> {
+                pendingBandwidth = parseHlsAttributeList(line.substringAfter(':'))["BANDWIDTH"]?.toLongOrNull() ?: 0L
+                expectUri = true
+            }
+            expectUri && line.isNotEmpty() && !line.startsWith("#") -> {
+                variants += HlsVariant(pendingBandwidth, resolveHlsUrl(baseUrl, line))
+                expectUri = false
+            }
+        }
+    }
+    return variants
+}
+
+private fun parseHlsMediaPlaylist(baseUrl: String, text: String): HlsParsedMedia {
+    var initSegmentUri: String? = null
+    var currentKey: HlsKey? = null
+    var pendingRange: Pair<Long?, Long>? = null
+    val nextRangeStartByUri = mutableMapOf<String, Long>()
+    var sawEndList = false
+    var isFmp4 = false
+    val mediaSequenceBase = text.lineSequence().firstNotNullOfOrNull { rawLine ->
+        val line = rawLine.trim()
+        if (line.startsWith("#EXT-X-MEDIA-SEQUENCE:")) {
+            line.substringAfter(':').trim().toLongOrNull()
+        } else {
+            null
+        }
+    } ?: 0L
+    val segments = mutableListOf<HlsSegment>()
+    var sequence = 0L
+    for (rawLine in text.lineSequence()) {
+        val line = rawLine.trim()
+        when {
+            line.isEmpty() -> Unit
+            line == "#EXT-X-ENDLIST" -> sawEndList = true
+            line.startsWith("#EXT-X-MAP:") -> {
+                parseHlsAttributeList(line.substringAfter(':'))["URI"]?.let { uri ->
+                    initSegmentUri = resolveHlsUrl(baseUrl, uri)
+                    isFmp4 = true
+                }
+            }
+            line.startsWith("#EXT-X-KEY:") -> {
+                val attrs = parseHlsAttributeList(line.substringAfter(':'))
+                currentKey = HlsKey(
+                    method = attrs["METHOD"]?.uppercase() ?: "NONE",
+                    uri = attrs["URI"]?.let { resolveHlsUrl(baseUrl, it) },
+                    iv = attrs["IV"]?.let(::parseHlsIv),
+                )
+            }
+            line.startsWith("#EXT-X-BYTERANGE:") -> {
+                val spec = line.substringAfter(':').trim()
+                val length = spec.substringBefore('@').toLongOrNull()
+                val start = spec.substringAfter('@', "").toLongOrNull()
+                if (length != null && length > 0L) {
+                    pendingRange = start to length
+                }
+            }
+            line.startsWith("#") -> Unit
+            else -> {
+                val resolved = resolveHlsUrl(baseUrl, line)
+                val lower = resolved.substringBefore('?').substringBefore('#').lowercase()
+                if (lower.endsWith(".m4s") || lower.endsWith(".mp4") ||
+                    lower.endsWith(".m4a") || lower.endsWith(".cmfv") || lower.endsWith(".cmfa")
+                ) {
+                    isFmp4 = true
+                }
+                val (explicitStart, length) = pendingRange ?: (null to null)
+                pendingRange = null
+                val start = explicitStart ?: nextRangeStartByUri[resolved]
+                if (length != null && length > 0L) {
+                    nextRangeStartByUri[resolved] = (start ?: 0L) + length
+                }
+                segments += HlsSegment(
+                    uri = resolved,
+                    rangeStart = start.takeIf { length != null },
+                    rangeLength = length,
+                    key = currentKey,
+                    sequence = mediaSequenceBase + sequence,
+                )
+                sequence++
+            }
+        }
+    }
+    return HlsParsedMedia(initSegmentUri, segments, sawEndList, isFmp4)
+}
+
+private fun parseHlsAttributeList(spec: String): Map<String, String> {
+    val result = mutableMapOf<String, String>()
+    val key = StringBuilder()
+    val value = StringBuilder()
+    var readingKey = true
+    var inQuotes = false
+    fun flush() {
+        if (key.isNotEmpty()) {
+            result[key.toString().trim().uppercase()] = value.toString()
+        }
+        key.clear()
+        value.clear()
+        readingKey = true
+    }
+    for (c in spec) {
+        when {
+            readingKey && c == '=' -> readingKey = false
+            !readingKey && c == '"' -> inQuotes = !inQuotes
+            !readingKey && !inQuotes && c == ',' -> flush()
+            readingKey -> key.append(c)
+            else -> value.append(c)
+        }
+    }
+    flush()
+    return result
+}
+
+private fun resolveHlsUrl(baseUrl: String, reference: String): String {
+    val ref = reference.trim()
+    if (ref.startsWith("http://", ignoreCase = true) || ref.startsWith("https://", ignoreCase = true)) {
+        return ref
+    }
+    return runCatching { URI(baseUrl).resolve(ref).toString() }.getOrNull() ?: ref
+}
+
+private fun parseHlsIv(raw: String): ByteArray? {
+    var hex = raw.trim().removePrefix("0x").removePrefix("0X")
+    if (hex.length > 32 || hex.any { !it.isDigit() && it.lowercaseChar() !in 'a'..'f' }) return null
+    hex = hex.padStart(32, '0')
+    return runCatching {
+        ByteArray(16) { index -> hex.substring(index * 2, index * 2 + 2).toInt(16).toByte() }
+    }.getOrNull()
+}
+
+private fun hlsSequenceIv(sequence: Long): ByteArray {
+    val iv = ByteArray(16)
+    for (i in 0 until 8) {
+        iv[8 + i] = (sequence shr ((7 - i) * 8)).toByte()
+    }
+    return iv
+}
+
+private fun aes128CbcDecrypt(key: ByteArray, iv: ByteArray, data: ByteArray): ByteArray {
+    val cipher = Cipher.getInstance("AES/CBC/NoPadding")
+    cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), IvParameterSpec(iv))
+    return cipher.doFinal(data)
 }

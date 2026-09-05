@@ -170,7 +170,7 @@ object AuthRepository {
 
         val params = rawParams.split('&').associate {
             val parts = it.split('=', limit = 2)
-            parts[0].trim().lowercase() to (parts.getOrNull(1)?.trim().orEmpty())
+            parts[0].trim().lowercase() to parts.getOrNull(1)?.trim().orEmpty().urlDecodedParam()
         }
 
         val errorDescription = params["error_description"] ?: params["error"]
@@ -355,6 +355,44 @@ object AuthRepository {
             current = current.cause
         }
         return null
+    }
+
+    /**
+     * Percent-decodes a single OAuth callback parameter value (`+` -> space,
+     * `%XX` -> UTF-8 bytes). Pure Kotlin so it stays commonMain-safe.
+     * Returns the input unchanged when there is nothing to decode or decoding
+     * fails, so malformed callbacks can never crash the deeplink handler.
+     */
+    private fun String.urlDecodedParam(): String {
+        if ('%' !in this && '+' !in this) return this
+        return runCatching {
+            val bytes = ArrayList<Byte>(length)
+            var i = 0
+            while (i < length) {
+                val c = this[i]
+                when {
+                    c == '+' -> {
+                        bytes.add(' '.code.toByte())
+                        i++
+                    }
+                    c == '%' && i + 2 < length -> {
+                        val code = substring(i + 1, i + 3).toIntOrNull(16)
+                        if (code != null) {
+                            bytes.add(code.toByte())
+                            i += 3
+                        } else {
+                            bytes.add(c.code.toByte())
+                            i++
+                        }
+                    }
+                    else -> {
+                        c.toString().encodeToByteArray().forEach { bytes.add(it) }
+                        i++
+                    }
+                }
+            }
+            bytes.toByteArray().decodeToString()
+        }.getOrDefault(this)
     }
 
     private fun Throwable.safeAuthErrorDescription(): String? =

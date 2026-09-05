@@ -69,6 +69,8 @@ object DownloadSourceResolver {
         sources
             .filter { it.isDownloadableFileSource() }
             .maxWithOrNull(compareByDescending<StreamItem> { it.downloadQualityScore }
+                // At equal quality, a single direct file is more reliable than an HLS playlist.
+                .thenByDescending { !it.isHlsDownloadSource }
                 .thenByDescending { it.downloadAvailabilityScore }
                 .thenByDescending { it.downloadSpeedScore })
 
@@ -98,10 +100,15 @@ internal val StreamItem.downloadFileExtension: String
             behaviorHints.filename?.substringBefore('?')?.substringBefore('#')?.substringAfterLast('.', ""),
             clientResolve?.filename?.substringBefore('?')?.substringBefore('#')?.substringAfterLast('.', ""),
         )
-        return candidates.firstOrNull { it.length in 2..5 && it.all(Char::isLetterOrDigit) }
+        val raw = candidates.firstOrNull { it.length in 2..5 && it.all(Char::isLetterOrDigit) }
             ?.lowercase()
             ?: "mp4"
+        // HLS playlists are saved as a single concatenated transport-stream file.
+        return if (raw == "m3u8") "ts" else raw
     }
+
+internal val StreamItem.isHlsDownloadSource: Boolean
+    get() = downloadableFileUrl?.isHlsPlaylistUrl() == true
 
 internal val StreamItem.downloadQualityScore: Int
     get() {
@@ -162,13 +169,29 @@ internal fun StreamItem.isDownloadableFileSource(): Boolean =
     downloadableFileUrl != null
 
 internal fun String.isSupportedDownloadFileUrl(): Boolean {
-    val normalized = trim().lowercase()
-    if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) return false
-    if (normalized.contains(".m3u8") || normalized.contains(".mpd") || normalized.contains(".torrent")) return false
+    val normalized = trim()
+    if (!normalized.startsWith("http://", ignoreCase = true) && !normalized.startsWith("https://", ignoreCase = true)) {
+        return false
+    }
+    // HLS playlists are downloadable: the platform downloader fetches the
+    // playlist, downloads every segment and concatenates them into one file.
+    if (normalized.isHlsPlaylistUrl()) return true
+    val lower = normalized.lowercase()
+    if (lower.contains(".mpd") || lower.contains(".torrent")) return false
 
-    val path = normalized.substringBefore('?').substringBefore('#')
+    val path = lower.substringBefore('?').substringBefore('#')
     val extension = path.substringAfterLast('.', "")
     return extension in setOf("mp4", "mkv", "webm", "m4v", "mov", "avi", "ts", "mpeg", "mpg")
+}
+
+/** True for `http(s)` URLs whose path points at an HLS playlist (`.m3u8`). */
+internal fun String.isHlsPlaylistUrl(): Boolean {
+    val normalized = trim()
+    if (!normalized.startsWith("http://", ignoreCase = true) && !normalized.startsWith("https://", ignoreCase = true)) {
+        return false
+    }
+    val path = normalized.substringBefore('?').substringBefore('#').lowercase()
+    return path.endsWith(".m3u8")
 }
 
 data class DownloadTarget(

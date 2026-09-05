@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -50,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.nuvio.app.core.ui.liquidGlass
 import com.nuvio.app.features.streams.StreamItem
 
@@ -186,6 +189,8 @@ private fun DownloadProgressPopup(
     }
 }
 
+private const val MAX_PICKER_SOURCES = 30
+
 @Composable
 fun DownloadSourcePickerDialog(
     sources: List<StreamItem>,
@@ -193,21 +198,53 @@ fun DownloadSourcePickerDialog(
     onDismiss: () -> Unit,
     onSelected: (StreamItem) -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    // Defensive: only ever offer sources the downloader can actually save
+    // (direct files + HLS playlists), best-first so the top row matches
+    // what a single tap on the download button would pick.
+    val downloadable = remember(sources) {
+        sources.filter { it.isDownloadableFileSource() }
+            .sortedWith(
+                compareByDescending<StreamItem> { it.downloadQualityScore }
+                    .thenByDescending { !it.isHlsDownloadSource }
+                    .thenByDescending { it.downloadAvailabilityScore }
+                    .thenByDescending { it.downloadSpeedScore },
+            )
+            .take(MAX_PICKER_SOURCES)
+    }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(0.88f)
+                .widthIn(max = 400.dp)
                 .clip(RoundedCornerShape(28.dp))
                 .liquidGlass(shape = RoundedCornerShape(28.dp))
                 .padding(18.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
-            Text("Downloadable sources only", style = MaterialTheme.typography.bodySmall)
+            Text(
+                text = if (downloadable.isEmpty()) {
+                    "No downloadable source found"
+                } else if (downloadable.size == 1) {
+                    "1 downloadable source — tap to download"
+                } else {
+                    "${downloadable.size} downloadable sources — tap one to download"
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
             Spacer(Modifier.height(12.dp))
 
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(sources.take(30), key = { "${it.addonId}:${it.playableDirectUrl}:${it.behaviorHints.filename}" }) { stream ->
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 360.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(
+                    downloadable,
+                    key = { "${it.addonId}:${it.playableDirectUrl}:${it.behaviorHints.filename}" },
+                ) { stream ->
                     DownloadSourceRow(stream = stream, onClick = { onSelected(stream) })
                 }
             }
@@ -246,7 +283,7 @@ private fun DownloadSourceRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(stream.addonName, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                "${stream.downloadQualityLabel} • ${stream.downloadFileExtension.uppercase()}${size?.let { " • ${formatDownloadBytes(it)}" } ?: ""}",
+                "${stream.downloadQualityLabel} • ${stream.downloadFileExtension.uppercase()}${if (stream.isHlsDownloadSource) " • HLS" else ""}${size?.let { " • ${formatDownloadBytes(it)}" } ?: ""}",
                 style = MaterialTheme.typography.bodySmall,
             )
         }

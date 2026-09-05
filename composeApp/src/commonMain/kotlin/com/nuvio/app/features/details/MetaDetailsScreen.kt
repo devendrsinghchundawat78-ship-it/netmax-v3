@@ -240,6 +240,8 @@ fun MetaDetailsScreen(
     var downloadPickerSources by remember(type, id) { mutableStateOf<List<StreamItem>>(emptyList()) }
     var downloadPickerTarget by remember(type, id) { mutableStateOf<DownloadTarget?>(null) }
     var downloadPickerLoading by remember(type, id) { mutableStateOf(false) }
+    val downloadFindingSourcesText = stringResource(Res.string.downloads_finding_sources)
+    val downloadNoSourceText = stringResource(Res.string.downloads_no_source_found)
     var showLibraryListPicker by remember(type, id) { mutableStateOf(false) }
     var pickerTabs by remember(type, id) { mutableStateOf<List<TrackingLibraryTab>>(emptyList()) }
     var pickerMembership by remember(type, id) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
@@ -809,6 +811,9 @@ fun MetaDetailsScreen(
                     val target = currentDownloadTarget()
                     if (!downloadPickerLoading) {
                         downloadPickerLoading = true
+                        // Instant feedback: source resolution can take several
+                        // seconds, and previously the tap looked completely dead.
+                        NuvioToastController.show(downloadFindingSourcesText)
                         detailsScope.launch {
                             val sources = runCatching {
                                 DownloadSourceResolver.loadDownloadableSources(
@@ -823,7 +828,7 @@ fun MetaDetailsScreen(
                             if (best != null) {
                                 enqueueDownload(target, best)
                             } else {
-                                NuvioToastController.show("No MP4/MKV download source found")
+                                NuvioToastController.show(downloadNoSourceText)
                             }
                         }
                     }
@@ -833,6 +838,7 @@ fun MetaDetailsScreen(
                     val target = currentDownloadTarget()
                     if (!downloadPickerLoading) {
                         downloadPickerLoading = true
+                        NuvioToastController.show(downloadFindingSourcesText)
                         detailsScope.launch {
                             val sources = runCatching {
                                 DownloadSourceResolver.loadDownloadableSources(
@@ -847,7 +853,7 @@ fun MetaDetailsScreen(
                                 downloadPickerTarget = target
                                 downloadPickerSources = sources
                             } else {
-                                NuvioToastController.show("No MP4/MKV download source found")
+                                NuvioToastController.show(downloadNoSourceText)
                             }
                         }
                     }

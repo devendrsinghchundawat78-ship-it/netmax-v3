@@ -1,5 +1,6 @@
 package com.nuvio.app.core.sync
 
+import co.touchlab.kermit.Logger
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -10,6 +11,8 @@ import kotlinx.serialization.json.put
 
 internal const val PROVIDER_API_KEY_FIELD = "api_key"
 internal const val PROVIDER_CLIENT_ID_FIELD = "client_id"
+
+private val credentialModelsLog = Logger.withTag("ProviderCredentialModels")
 
 internal object ProviderCredentialIds {
     const val TMDB = "tmdb"
@@ -43,10 +46,13 @@ internal data class ProviderCredentialSnapshot(
         return copy(
             values = values.map { local ->
                 val remote = remoteByProvider[local.provider] ?: return@map local
-                val element = remote.credentialJson[local.field] as? JsonPrimitive
-                    ?: error("Invalid credential payload for ${local.provider}")
-                val value = element.contentOrNull
-                    ?: error("Invalid credential value for ${local.provider}")
+                // Never fail the whole credential sync for a single malformed
+                // server row: keep the local value and warn instead.
+                val value = (remote.credentialJson[local.field] as? JsonPrimitive)?.contentOrNull
+                if (value == null) {
+                    credentialModelsLog.w { "Ignoring invalid credential payload for ${local.provider}" }
+                    return@map local
+                }
                 local.copy(value = value.trim())
             },
         )

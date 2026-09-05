@@ -180,7 +180,7 @@ object ProviderCredentialSync {
     }
 
     private fun currentSnapshot(profileId: Int): ProviderCredentialSnapshot {
-        check(ProfileRepository.activeProfileId == profileId)
+        ensureActiveProfile(profileId)
         val snapshot = buildSnapshot(
             profileId = profileId,
             debrid = DebridSettingsRepository.snapshot(),
@@ -188,8 +188,16 @@ object ProviderCredentialSync {
             mdbList = MdbListSettingsRepository.snapshot(),
             player = PlayerSettingsRepository.uiState.value,
         )
-        check(ProfileRepository.activeProfileId == profileId)
+        ensureActiveProfile(profileId)
         return snapshot
+    }
+
+    private fun ensureActiveProfile(profileId: Int) {
+        // Profile switches mid-sync are normal: cancel cooperatively (like
+        // requireCurrentScope) instead of failing the step with an error.
+        if (ProfileRepository.activeProfileId != profileId) {
+            throw CancellationException("Active profile changed during provider credential sync")
+        }
     }
 
     private fun buildSnapshot(

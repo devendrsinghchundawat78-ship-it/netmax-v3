@@ -160,6 +160,7 @@ fun StreamsScreen(
     val clipboardManager = LocalClipboardManager.current
     val streamLinkCopiedText = stringResource(Res.string.streams_link_copied)
     val noDirectStreamLinkText = stringResource(Res.string.streams_no_direct_link)
+    val findingDownloadSourcesText = stringResource(Res.string.downloads_finding_sources)
     var streamActionsTarget by remember(videoId) { mutableStateOf<StreamItem?>(null) }
     val downloadScope = rememberCoroutineScope()
     var preferredFilterApplied by remember(videoId) { mutableStateOf(false) }
@@ -403,6 +404,7 @@ fun StreamsScreen(
             },
             onDownload = { stream ->
                 if (DirectDebridPlaybackResolver.shouldResolveToPlayableStream(stream)) {
+                    NuvioToastController.show(findingDownloadSourcesText)
                     downloadScope.launch {
                         val resolved = DirectDebridPlaybackResolver.resolveToPlayableStream(
                             stream = stream,

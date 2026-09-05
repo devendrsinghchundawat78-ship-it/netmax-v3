@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -64,6 +66,13 @@ private const val NETMAX_PROVIDER_BASE_CDN =
 private const val NETMAX_PROVIDER_BASE_GITHACK =
     "https://raw.githack.com/NuvioPlugin/All-in-One-Nuvio/main/"
 private const val NETMAX_PROVIDER_REFRESH_INTERVAL_MS = 8 * 60 * 60 * 1_000L
+
+// Fan-out guards: a manifest can list dozens of providers. Downloading every
+// provider at app launch, or executing every scraper on the streams screen,
+// without bounds stampedes the network, melts the CPU (dex2oat + QuickJS)
+// and balloons memory (all base64 .cs3 binaries in RAM at once).
+private const val PROVIDER_FETCH_CONCURRENCY = 6
+private const val SCRAPER_EXECUTION_CONCURRENCY = 8
 
 @Serializable
 private data class PluginRow(
@@ -109,6 +118,8 @@ actual object PluginRepository {
     private val persistenceRevision = atomic(0L)
     private val persistenceLock = SynchronizedObject()
     private val persistedRevisionByProfile = mutableMapOf<Int, Long>()
+    private val providerFetchPermits = Semaphore(PROVIDER_FETCH_CONCURRENCY)
+    private val scraperExecutionPermits = Semaphore(SCRAPER_EXECUTION_CONCURRENCY)
 
     actual fun initialize() {
         val effectiveProfileId = resolveEffectiveProfileId(ProfileRepository.activeProfileId)
@@ -416,7 +427,10 @@ actual object PluginRepository {
             mediaType = mediaType,
         )
 
-        return runCatching {
+        // Bound: the streams screen launches one job per scraper; never run
+        // all providers (dex2oat + QuickJS) at the same time.
+        return scraperExecutionPermits.withPermit {
+            runCatching {
             if (scraper.formats?.contains("cs3") == true || scraper.filename.endsWith(".cs3")) {
                 CloudstreamPluginRuntime.executePlugin(
                     code = scraper.code,
@@ -435,6 +449,7 @@ actual object PluginRepository {
                     episode = episode,
                     scraperId = scraper.id,
                 )
+            }
             }
         }
     }
@@ -486,6 +501,8 @@ actual object PluginRepository {
                             val previous = previousForRepo[scraperId]
                             val sameVersion = previous != null && previous.version == info.version
                             val isCs3 = info.formats?.contains("cs3") == true || info.filename.endsWith(".cs3")
+                            // Bound: never download all providers at once on app launch.
+                            providerFetchPermits.withPermit {
                             runCatching {
                                 // Keep a working cached provider when an upstream CDN is
                                 // temporarily unavailable. Only fetch when the version
@@ -533,6 +550,7 @@ actual object PluginRepository {
                                     code = code,
                                 )
                             }.getOrNull()
+                            }
                         }
                     }
                     .awaitAll()

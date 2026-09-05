@@ -29,6 +29,9 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Guard Against Android SVG Drawables
+        run: bash scripts/check-no-android-svg.sh
+
       - name: Prepare Keystore and Build Configuration
         run: |
           echo "=== Generating Release Signing Keystore ==="
