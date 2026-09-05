@@ -357,7 +357,7 @@ private fun buildDownloadHeaders(sourceHeaders: Map<String, String>): Headers {
  * encrypted segments are decrypted; other encryption schemes fail with a clear
  * message instead of producing an unplayable file.
  */
-private suspend fun downloadHlsPlaylist(
+private suspend fun CoroutineScope.downloadHlsPlaylist(
     playlistUrl: String,
     downloadsDir: File,
     destination: File,
@@ -407,7 +407,7 @@ private suspend fun downloadHlsPlaylist(
 
     FileOutputStream(tempFile, false).use { output ->
         parsed.initSegmentUri?.let { initUri ->
-            coroutineContext.ensureActive()
+            ensureActive()
             val bytes = fetchHlsBytes(initUri, headers, null, null, registerCall)
                 ?: error(runBlocking { getString(Res.string.downloads_error_hls_playlist) })
             output.write(bytes)
@@ -415,7 +415,7 @@ private suspend fun downloadHlsPlaylist(
             onProgress(downloadedBytes, null)
         }
         for (segment in segments) {
-            coroutineContext.ensureActive()
+            ensureActive()
             val key = segment.key
             if (key != null && key.method != "NONE" && key.method != "AES-128") {
                 error(runBlocking { getString(Res.string.downloads_error_hls_encrypted) })
