@@ -47,6 +47,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -722,7 +723,9 @@ private fun CustomThemeHueBar(
                 .fillMaxHeight()
                 .aspectRatio(1f)
                 .padding(3.dp)
-                .offset(x = (barSize.width * fraction - with(LocalDensity.current) { 15.dp.toPx() }).coerceAtLeast(0f))
+                .offset(x = with(LocalDensity.current) {
+                    (barSize.width * fraction - 15.dp.toPx()).coerceAtLeast(0f).toDp()
+                })
                 .clip(CircleShape)
                 .background(Color.White)
                 .border(2.dp, Color.Black.copy(alpha = 0.35f), CircleShape),

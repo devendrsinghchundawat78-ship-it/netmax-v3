@@ -30,6 +30,8 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Forward10
+import androidx.compose.material.icons.rounded.Fullscreen
+import androidx.compose.material.icons.rounded.FullscreenExit
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Replay10
@@ -50,9 +52,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.FillRule
-import androidx.compose.ui.graphics.addPath
-import androidx.compose.ui.graphics.pathData
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -426,8 +425,8 @@ private fun PlayerHeader(
 }
 
 /**
- * Fullscreen affordance for the embedded player. Kept next to the existing header icons;
- * materialIconsExtended is already on the classpath (see composeApp/build.gradle.kts).
+ * Fullscreen affordance for the embedded player, next to the existing header icons.
+ * Uses the rounded Material icons that compose.materialIconsExtended provides.
  */
 private val PlayerFullscreenIcon: ImageVector = Icons.Rounded.Fullscreen
 private val PlayerFullscreenExitIcon: ImageVector = Icons.Rounded.FullscreenExit
