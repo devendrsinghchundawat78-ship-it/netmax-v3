@@ -43,24 +43,37 @@ internal object PluginManifestParser {
         val pluginsArray = when (root) {
             is JsonArray -> root
             is JsonObject -> {
-                ((root["plugins"] ?: root["scrapers"]) as? JsonArray)
+                (root["plugins"] ?: root["scrapers"] ?: root["providers"]) as? JsonArray
+                    ?: ((root["data"] as? JsonObject)?.let {
+                        (it["plugins"] ?: it["scrapers"]) as? JsonArray
+                    })
             }
             else -> null
         } ?: return null
 
         val scrapers = pluginsArray.mapNotNull { elem ->
             val obj = elem as? JsonObject ?: return@mapNotNull null
-            val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-            val internalName = obj["internalName"]?.jsonPrimitive?.contentOrNull ?: name
-            val url = obj["url"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val name = (obj["name"] ?: obj["title"])?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val fileName = obj["fileName"]?.jsonPrimitive?.contentOrNull
+            val internalName = obj["internalName"]?.jsonPrimitive?.contentOrNull
+                ?: fileName?.removeSuffix(".cs3")
+                ?: name
+            // Repos publish either a full download url or just the file name; both work
+            // because the caller retries relative names against the repository base urls.
+            val url = listOf("url", "fileUrl", "downloadUrl")
+                .firstNotNullOfOrNull { key -> obj[key]?.jsonPrimitive?.contentOrNull }
+                ?: fileName
+                ?: return@mapNotNull null
             val version = obj["version"]?.jsonPrimitive?.contentOrNull ?: "1"
             val iconUrl = obj["iconUrl"]?.jsonPrimitive?.contentOrNull
 
             val tvTypes = (obj["tvTypes"] as? JsonArray)?.mapNotNull {
                 it.jsonPrimitive.contentOrNull
-            } ?: listOf("Movie", "TvSeries")
+            }?.takeIf { it.isNotEmpty() }
+                ?: obj["tvType"]?.jsonPrimitive?.contentOrNull?.let { listOf(it) }
+                ?: listOf("Movie", "TvSeries")
 
-            val supportedTypes = tvTypes.map { mapCloudStreamTvType(it) }.distinct()
+            val supportedTypes = tvTypes.flatMap { mapCloudStreamTvType(it) }.distinct()
 
             PluginManifestScraper(
                 id = internalName,
@@ -93,9 +106,11 @@ internal object PluginManifestParser {
         )
     }
 
-    private fun mapCloudStreamTvType(tvType: String): String = when (tvType.lowercase()) {
-        "movie", "animemovie" -> "movie"
-        "tvseries", "anime", "ova", "cartoon", "asiandrama", "documentary" -> "tv"
-        else -> "movie"
+    /** A repo entry can serve both browsable types, so one tag may map to several. */
+    private fun mapCloudStreamTvType(tvType: String): List<String> = when (tvType.lowercase()) {
+        "movie", "animemovie" -> listOf("movie")
+        "tvseries", "anime", "ova", "cartoon", "asiandrama", "documentary" -> listOf("tv")
+        "all", "tv" -> listOf("movie", "tv")
+        else -> listOf("movie", "tv")
     }
 }

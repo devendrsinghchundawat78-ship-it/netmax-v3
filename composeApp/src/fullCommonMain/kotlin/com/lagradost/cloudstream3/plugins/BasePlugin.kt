@@ -1,43 +1,95 @@
+@file:OptIn(com.lagradost.cloudstream3.InternalAPI::class, com.lagradost.cloudstream3.Prerelease::class)
 package com.lagradost.cloudstream3.plugins
 
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.lagradost.cloudstream3.APIHolder
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.utils.ExtractorApi
+import com.lagradost.api.Log
 import com.lagradost.cloudstream3.utils.extractorApis
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
-@Target(AnnotationTarget.CLASS)
-@Retention(AnnotationRetention.RUNTIME)
-annotation class CloudstreamPlugin
+const val PLUGIN_TAG = "PluginInstance"
 
-open class BasePlugin {
-    var activity: Any? = null
-    var context: Any? = null
-    var openSettings: ((Any) -> Unit)? = null
+abstract class BasePlugin {
 
-    val registeredApis = mutableListOf<MainAPI>()
-    val registeredExtractors = mutableListOf<ExtractorApi>()
+    /**
+     * MainAPI instances this plugin registered. The host reads this right after
+     * calling load() to pick the provider out of a .cs3.
+     */
+    val registeredApis: List<MainAPI>
+        get() = synchronized(_registeredApis) { _registeredApis.toList() }
 
-    open fun load() {}
+    /** ExtractorApi instances registered through [registerExtractorAPI]. */
+    val registeredExtractors: List<ExtractorApi>
+        get() = synchronized(_registeredExtractors) { _registeredExtractors.toList() }
 
-    open fun load(context: Any) {
-        this.context = context
-        load()
+    private val _registeredApis = mutableListOf<MainAPI>()
+    private val _registeredExtractors = mutableListOf<ExtractorApi>()
+
+    /**
+     * Used to register providers instances of MainAPI
+     * @param element MainAPI provider you want to register
+     */
+    fun registerMainAPI(element: MainAPI) {
+        Log.i(PLUGIN_TAG, "Adding ${element.name} (${element.mainUrl}) MainAPI")
+        element.sourcePlugin = this.filename
+        synchronized(_registeredApis) { _registeredApis.add(element) }
+        APIHolder.allProviders.add(element)
+        APIHolder.addPluginMapping(element)
     }
 
-    fun registerMainAPI(api: MainAPI) {
-        registeredApis.add(api)
+    /**
+     * Used to register extractor instances of ExtractorApi
+     * @param element ExtractorApi provider you want to register
+     */
+    fun registerExtractorAPI(element: ExtractorApi) {
+        Log.i(PLUGIN_TAG, "Adding ${element.name} (${element.mainUrl}) ExtractorApi")
+        element.sourcePlugin = this.filename
+        synchronized(_registeredExtractors) { _registeredExtractors.add(element) }
+        extractorApis.add(element)
     }
 
-    fun registerExtractorAPI(extractor: ExtractorApi) {
-        registeredExtractors.add(extractor)
-        if (!extractorApis.contains(extractor)) {
-            extractorApis.add(extractor)
+    /**
+     * Called when your Plugin is being unloaded
+     */
+    @Throws(Throwable::class)
+    open fun beforeUnload() {
+    }
+
+    /**
+     * Called when your Plugin is loaded
+     */
+    @Throws(Throwable::class)
+    open fun load() {
+    }
+
+    /** Full file path to the plugin. */
+    @Deprecated(
+        "Renamed to `filename` to follow conventions",
+        replaceWith = ReplaceWith("filename"),
+        level = DeprecationLevel.ERROR
+    )
+    var __filename: String?
+        get() = filename
+        set(value) {
+            filename = value
         }
-    }
+    var filename: String? = null
 
-    fun addExtractor(extractor: ExtractorApi) {
-        registerExtractorAPI(extractor)
+    @Serializable
+    class Manifest {
+        @JsonProperty("name") @SerialName("name")
+        var name: String? = null
+
+        @JsonProperty("pluginClassName") @SerialName("pluginClassName")
+        var pluginClassName: String? = null
+
+        @JsonProperty("requiresResources") @SerialName("requiresResources")
+        var requiresResources: Boolean = false
+
+        @JsonProperty("version") @SerialName("version")
+        var version: Int? = null
     }
 }
-
-// Backward compatibility alias
-typealias Plugin = BasePlugin

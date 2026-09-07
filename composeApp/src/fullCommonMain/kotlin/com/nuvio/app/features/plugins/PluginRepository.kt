@@ -474,17 +474,10 @@ actual object PluginRepository {
         val storageProfileId = currentProfileId
         return withContext(Dispatchers.Default) {
             var targetPayload = fetchTextWithMirrors(manifestUrl)
-            if (targetPayload.contains("\"pluginLists\"")) {
-                runCatching {
-                    val root = json.parseToJsonElement(targetPayload) as? kotlinx.serialization.json.JsonObject
-                    val list = (root?.get("pluginLists") as? kotlinx.serialization.json.JsonArray)?.mapNotNull {
-                        (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
-                    }
-                    val targetUrl = list?.firstOrNull()
-                    if (!targetUrl.isNullOrBlank()) {
-                        targetPayload = fetchTextWithMirrors(targetUrl)
-                    }
-                }
+            // A CloudStream repo.json only points at its plugin lists; merge them all so
+            // repositories that split providers over several files still show every provider.
+            targetPayload = resolveCloudStreamRepoPayload(targetPayload) { url ->
+                fetchTextWithMirrors(url)
             }
             val manifest = PluginManifestParser.parse(targetPayload)
             val baseUrls = providerBaseUrlsForManifest(manifestUrl)
@@ -803,22 +796,11 @@ actual object PluginRepository {
     }
 
     private fun normalizeManifestUrl(rawUrl: String): String {
-        val trimmed = rawUrl.trim()
-        require(trimmed.isNotEmpty()) { runBlocking { getString(Res.string.plugins_error_enter_repo_url) } }
-
-        val normalizedScheme = when {
-            trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
-            else -> "https://$trimmed"
-        }
-
-        val withoutFragment = normalizedScheme.substringBefore("#")
-        val query = withoutFragment.substringAfter("?", "")
-        val path = withoutFragment.substringBefore("?").trimEnd('/')
-        val manifestPath = when {
-            path.endsWith("/manifest.json") || path.endsWith("/repo.json") || path.endsWith("/plugins.json") || path.endsWith(".cs3") || path.endsWith(".json") -> path
-            else -> "$path/manifest.json"
-        }
-        return if (query.isEmpty()) manifestPath else "$manifestPath?$query"
+        // Scheme handling (including cloudstream:// deep links) lives in
+        // normalizeCloudStreamRepoUrl so it can be exercised without any app state.
+        val normalized = normalizeCloudStreamRepoUrl(rawUrl)
+        require(normalized != null) { runBlocking { getString(Res.string.plugins_error_enter_repo_url) } }
+        return normalized
     }
 
     private fun resolveEffectiveProfileId(profileId: Int): Int {

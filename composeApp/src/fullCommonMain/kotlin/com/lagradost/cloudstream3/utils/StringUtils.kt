@@ -1,7 +1,31 @@
+@file:OptIn(com.lagradost.cloudstream3.InternalAPI::class, com.lagradost.cloudstream3.Prerelease::class)
 package com.lagradost.cloudstream3.utils
 
-fun String.html(): org.jsoup.nodes.Document = org.jsoup.Jsoup.parse(this)
+import com.lagradost.cloudstream3.Prerelease
+import io.ktor.http.decodeURLQueryComponent
+import io.ktor.http.encodeURLParameter
 
-fun String.findFirst(regex: Regex): String? = regex.find(this)?.groupValues?.getOrNull(1)
+object StringUtils {
+    fun String.decodeUrl(): String {
+        return this.decodeURLQueryComponent()
+    }
 
-fun String.findFirst(regex: String): String? = Regex(regex).find(this)?.groupValues?.getOrNull(1)
+    fun String.encodeUrl(): String {
+        return this.encodeURLParameter()
+    }
+
+    @Deprecated(
+        message = "Use Ktor 'Url' naming convention instead.",
+        replaceWith = ReplaceWith("this.encodeUrl()"),
+        level = DeprecationLevel.WARNING,
+    )
+    fun String.encodeUri(): String = encodeUrl()
+
+    @Deprecated(
+        message = "Use Ktor 'Url' naming convention instead.",
+        replaceWith = ReplaceWith("this.decodeUrl()"),
+        level = DeprecationLevel.WARNING,
+    )
+    fun String.decodeUri(): String = decodeUrl()
+}
+

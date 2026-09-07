@@ -64,9 +64,15 @@ object CloudstreamPluginRuntime {
         val searchQuery = mediaTitle ?: tmdbId
         log.d { "Searching ${api.name} for '$searchQuery'" }
 
-        val searchResults = runCatching {
-            api.search(searchQuery)
-        }.getOrNull() ?: emptyList()
+        // Providers implement either search(query) or the paged search(query, page);
+        // whichever one they skip throws NotImplementedError out of the base class,
+        // so both have to be tried before a provider counts as "no results".
+        var searchResults = runCatching { api.search(searchQuery) }.getOrNull().orEmpty()
+        if (searchResults.isEmpty()) {
+            searchResults = runCatching {
+                api.search(searchQuery, 1)?.items.orEmpty()
+            }.getOrNull().orEmpty()
+        }
 
         if (searchResults.isEmpty()) {
             log.d { "No search results found on ${api.name} for '$searchQuery'" }
@@ -129,7 +135,7 @@ object CloudstreamPluginRuntime {
                                 url = sub.url,
                                 language = sub.lang.ifBlank { "Unknown" },
                                 name = sub.lang.takeIf { it.isNotBlank() },
-                                headers = sub.headers.takeIf { it.isNotEmpty() },
+                                headers = sub.headers?.takeIf { it.isNotEmpty() },
                             )
                         )
                     }
