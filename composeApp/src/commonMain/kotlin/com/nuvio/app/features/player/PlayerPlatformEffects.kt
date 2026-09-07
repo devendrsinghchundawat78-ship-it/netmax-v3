@@ -21,6 +21,13 @@ expect fun LockPlayerToLandscape()
 @Composable
 expect fun EnterImmersivePlayerMode(keepScreenAwake: Boolean)
 
+/**
+ * Applied when the player starts embedded: keeps the screen awake while the user opted out of
+ * immersive mode, and leaves the system bars and the device orientation alone.
+ */
+@Composable
+expect fun KeepPlayerScreenAwake(keepScreenAwake: Boolean)
+
 @Composable
 expect fun ManagePlayerPictureInPicture(
     isPlaying: Boolean,

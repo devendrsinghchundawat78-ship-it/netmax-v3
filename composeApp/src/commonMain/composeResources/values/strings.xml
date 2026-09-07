@@ -435,6 +435,8 @@
     <string name="compose_player_font_size">Font Size</string>
     <string name="compose_player_font_size_value">%1$dsp</string>
     <string name="compose_player_lock_controls">Lock player controls</string>
+    <string name="compose_player_enter_fullscreen">Fullscreen</string>
+    <string name="compose_player_exit_fullscreen">Exit fullscreen</string>
     <string name="compose_player_loading_lines">Loading subtitle lines...</string>
     <string name="compose_player_languages">Languages</string>
     <string name="compose_player_no_subtitle_lines_found">No subtitle lines found</string>
@@ -1185,6 +1187,11 @@
     <string name="settings_playback_stream_selection_mode_first_stream_description">Play the first available source automatically.</string>
     <string name="settings_playback_stream_selection_mode_manual">Manual (choose stream)</string>
     <string name="settings_playback_stream_selection_mode_manual_description">Always show source list and let me choose.</string>
+    <string name="settings_playback_auto_play_mode">Auto play mode</string>
+    <string name="settings_playback_auto_play_mode_description">When on, Play starts the best source right away and no source picker is shown. The player also opens embedded (non-fullscreen) with a Fullscreen button. When off, everything behaves exactly as before: source list first, and the player opens fullscreen landscape.</string>
+    <string name="settings_playback_auto_pick_480p">Auto pick 480p source</string>
+    <string name="settings_playback_auto_pick_480p_description">Data saver for auto play. When on, the source picked automatically is a 480p (SD) one instead of the first / highest quality source. If the episode or movie has no 480p source, the smallest available quality is used. Manual picks from the source list and downloads are not changed.</string>
+    <string name="settings_playback_source_scope_lowest_quality_sd">Smallest quality (480p)</string>
     <string name="settings_playback_stream_selection_mode_regex">Auto-play regex match</string>
     <string name="settings_playback_stream_selection_mode_regex_description">Play first source whose text matches your regex pattern.</string>
     <string name="settings_playback_stream_timeout">Stream Selection Timeout</string>
@@ -1355,6 +1362,16 @@
     <string name="theme_rose">Rose</string>
     <string name="theme_violet">Violet</string>
     <string name="theme_white">White</string>
+    <string name="theme_custom">Custom</string>
+    <string name="settings_appearance_custom_theme_description">Pick any colour and the whole app is rebuilt around it: buttons, highlights, focus rings and the tinted backgrounds. Your own colour, always available.</string>
+    <string name="settings_appearance_custom_theme_sheet_title">Pick your colour</string>
+    <string name="settings_appearance_custom_theme_presets">Start from a colour</string>
+    <string name="settings_appearance_custom_theme_hue">Hue</string>
+    <string name="settings_appearance_custom_theme_shade">Shade — tap or drag</string>
+    <string name="settings_appearance_custom_theme_hex">Colour value</string>
+    <string name="settings_appearance_custom_theme_hex_placeholder">#RRGGBB</string>
+    <string name="settings_appearance_custom_theme_invalid_hex">That is not a colour yet: use 6 hex digits, like 1E88E5.</string>
+    <string name="settings_appearance_custom_theme_preview_label">Preview</string>
     <string name="player_next_episode">Next Episode</string>
     <string name="player_next_episode_finding_source">Finding source…</string>
     <string name="player_next_episode_playing_via_countdown">Playing via %1$s in %2$d…</string>

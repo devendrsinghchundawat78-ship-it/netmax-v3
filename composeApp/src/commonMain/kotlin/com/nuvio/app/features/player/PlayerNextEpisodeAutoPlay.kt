@@ -75,7 +75,9 @@ internal fun CoroutineScope.launchPlayerNextEpisodeAutoPlay(
     } else {
         settings.streamAutoPlayMode
     }
-    val effectiveSource = if (shouldAutoSelectInManualMode) {
+    val effectiveSource = if (shouldAutoSelectInManualMode &&
+        settings.streamAutoPlaySource != StreamAutoPlaySource.LOWEST_QUALITY_SD
+    ) {
         StreamAutoPlaySource.ALL_SOURCES
     } else {
         settings.streamAutoPlaySource

@@ -50,6 +50,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.FillRule
+import androidx.compose.ui.graphics.addPath
+import androidx.compose.ui.graphics.pathData
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -86,6 +89,9 @@ internal fun PlayerControlsShell(
     resizeMode: PlayerResizeMode,
     isLocked: Boolean,
     showPlaybackControls: Boolean = true,
+    isFullscreen: Boolean = true,
+    canLeaveFullscreen: Boolean = false,
+    onFullscreenToggle: (() -> Unit)? = null,
     onLockToggle: () -> Unit,
     onBack: () -> Unit,
     onTogglePlayback: () -> Unit,
@@ -165,6 +171,9 @@ internal fun PlayerControlsShell(
                 episodeTitle = episodeTitle,
                 metrics = metrics,
                 isLocked = isLocked,
+                isFullscreen = isFullscreen,
+                canLeaveFullscreen = canLeaveFullscreen,
+                onFullscreenToggle = onFullscreenToggle,
                 showActions = showPlaybackControls,
                 onSubmitIntroClick = onSubmitIntroClick,
                 parentalWarnings = parentalWarnings,
@@ -237,6 +246,9 @@ private fun PlayerHeader(
     episodeTitle: String?,
     metrics: PlayerLayoutMetrics,
     isLocked: Boolean,
+    isFullscreen: Boolean = true,
+    canLeaveFullscreen: Boolean = false,
+    onFullscreenToggle: (() -> Unit)? = null,
     showActions: Boolean,
     onSubmitIntroClick: (() -> Unit)?,
     parentalWarnings: List<ParentalWarning>,
@@ -363,6 +375,21 @@ private fun PlayerHeader(
                             onClick = onOpenInExternalPlayer,
                         )
                     }
+                    if (onFullscreenToggle != null && canLeaveFullscreen) {
+                        PlayerHeaderIconButton(
+                            icon = if (isFullscreen) PlayerFullscreenExitIcon else PlayerFullscreenIcon,
+                            contentDescription = stringResource(
+                                if (isFullscreen) {
+                                    Res.string.compose_player_exit_fullscreen
+                                } else {
+                                    Res.string.compose_player_enter_fullscreen
+                                }
+                            ),
+                            buttonSize = metrics.headerIconSize + 16.dp,
+                            iconSize = metrics.headerIconSize,
+                            onClick = onFullscreenToggle,
+                        )
+                    }
                     PlayerHeaderIconButton(
                         icon = if (isLocked) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
                         contentDescription = if (isLocked) {
@@ -397,6 +424,13 @@ private fun PlayerHeader(
         }
     }
 }
+
+/**
+ * Fullscreen affordance for the embedded player. Kept next to the existing header icons;
+ * materialIconsExtended is already on the classpath (see composeApp/build.gradle.kts).
+ */
+private val PlayerFullscreenIcon: ImageVector = Icons.Rounded.Fullscreen
+private val PlayerFullscreenExitIcon: ImageVector = Icons.Rounded.FullscreenExit
 
 @Composable
 private fun PlayerHeaderIconButton(

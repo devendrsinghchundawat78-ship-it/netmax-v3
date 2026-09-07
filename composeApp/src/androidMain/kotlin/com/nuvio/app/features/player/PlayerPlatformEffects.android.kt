@@ -41,6 +41,18 @@ actual fun LockPlayerToLandscape() {
 }
 
 @Composable
+actual fun KeepPlayerScreenAwake(keepScreenAwake: Boolean) {
+    val activity = LocalContext.current.findActivity() ?: return
+    SideEffect {
+        if (keepScreenAwake) {
+            activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+}
+
+@Composable
 actual fun EnterImmersivePlayerMode(keepScreenAwake: Boolean) {
     val activity = LocalContext.current.findActivity() ?: return
 

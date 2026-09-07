@@ -186,5 +186,6 @@ object ThemeColors {
         AppTheme.AMBER -> Amber
         AppTheme.ROSE -> Rose
         AppTheme.WHITE -> White
+        AppTheme.CUSTOM -> ThemeCustomColor.paletteFor(ThemeCustomColor.accent)
     }
 }

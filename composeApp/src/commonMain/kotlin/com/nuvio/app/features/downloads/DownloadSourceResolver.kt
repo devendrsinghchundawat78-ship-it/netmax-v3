@@ -4,6 +4,7 @@ import com.nuvio.app.features.debrid.DirectDebridPlaybackResolver
 import com.nuvio.app.features.player.PlayerStreamsRepository
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamDebridCacheState
+import com.nuvio.app.features.streams.StreamQualityHints
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
@@ -111,26 +112,7 @@ internal val StreamItem.isHlsDownloadSource: Boolean
     get() = downloadableFileUrl?.isHlsPlaylistUrl() == true
 
 internal val StreamItem.downloadQualityScore: Int
-    get() {
-        val text = buildString {
-            append(name.orEmpty()).append(' ')
-            append(title.orEmpty()).append(' ')
-            append(description.orEmpty()).append(' ')
-            append(behaviorHints.filename.orEmpty()).append(' ')
-            append(clientResolve?.stream?.raw?.filename.orEmpty()).append(' ')
-            append(clientResolve?.stream?.raw?.parsed?.resolution.orEmpty())
-        }.lowercase()
-        return when {
-            Regex("\\b(4320p|8k)\\b").containsMatchIn(text) -> 8
-            Regex("\\b(2160p|4k|uhd)\\b").containsMatchIn(text) -> 7
-            Regex("\\b1440p\\b").containsMatchIn(text) -> 6
-            Regex("\\b1080p\\b|full[ .-]?hd").containsMatchIn(text) -> 5
-            Regex("\\b720p\\b|hd").containsMatchIn(text) -> 4
-            Regex("\\b576p\\b").containsMatchIn(text) -> 3
-            Regex("\\b480p\\b|sd").containsMatchIn(text) -> 2
-            else -> 1
-        }
-    }
+    get() = StreamQualityHints.scoreOf(this)
 
 internal val StreamItem.downloadAvailabilityScore: Int
     get() = when {
@@ -154,16 +136,7 @@ internal val StreamItem.downloadSpeedScore: Int
     }
 
 internal val StreamItem.downloadQualityLabel: String
-    get() = when (downloadQualityScore) {
-        8 -> "8K"
-        7 -> "4K"
-        6 -> "1440p"
-        5 -> "1080p"
-        4 -> "720p"
-        3 -> "576p"
-        2 -> "480p"
-        else -> "Unknown"
-    }
+    get() = StreamQualityHints.labelOf(downloadQualityScore)
 
 internal fun StreamItem.isDownloadableFileSource(): Boolean =
     downloadableFileUrl != null

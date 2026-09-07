@@ -19,7 +19,9 @@ fun availableAppThemes(entitlements: CosmeticEntitlements): List<AppTheme> {
         .filterValues(entitlements::includes)
         .keys
         .toList()
-    return supporter + standardThemes
+    // The user's own colour is a mixing tool, not a cosmetic unlock, so it is always available
+    // (listed last, after every shipped palette).
+    return supporter + standardThemes + AppTheme.CUSTOM
 }
 
 fun resolveAppTheme(

@@ -4,6 +4,8 @@ import kotlinx.serialization.json.JsonObject
 
 internal expect object ThemeSettingsStorage {
     fun loadSelectedTheme(): String?
+    fun loadCustomThemeAccent(): String?
+    fun saveCustomThemeAccent(accentHex: String)
     fun loadThemeMode(): String?
     fun saveThemeMode(modeKey: String)
     fun saveSelectedTheme(themeName: String)

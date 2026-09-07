@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.core.ui.PlatformBackHandler
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
@@ -40,12 +41,18 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun PlayerScreenContent(args: PlayerScreenArgs) {
-    LockPlayerToLandscape()
-
     val playerSettingsUiState by remember {
         PlayerSettingsRepository.ensureLoaded()
         PlayerSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
+
+    // Auto play mode opens the player embedded (non-fullscreen); the Fullscreen button in the
+    // player header is then the only way into landscape immersive. With Auto play mode off this
+    // resolves to FullscreenLandscape, i.e. exactly the previous behaviour.
+    // Both presentation effects are applied together below so their enter/leave lifetimes match.
+    val playerDisplayMode =
+        if (playerSettingsUiState.playerOpensEmbedded) PlayerDisplayMode.Embedded
+        else PlayerDisplayMode.FullscreenLandscape
     val p2pSettingsUiState by remember {
         P2pSettingsRepository.ensureLoaded()
         P2pSettingsRepository.uiState
@@ -80,12 +87,26 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
     ) {
         val density = LocalDensity.current
         val horizontalSafePadding = playerHorizontalSafePadding()
+
+        // System/gesture back leaves fullscreen before leaving the player, so the video keeps
+        // playing in the embedded container instead of exiting playback. No-op otherwise, and
+        // never registered in the classic always-fullscreen layout (behaviour unchanged there).
+        PlatformBackHandler(enabled = runtime.playerFullscreenRequested) {
+            runtime.playerFullscreenRequested = false
+        }
         val metrics = remember(maxWidth) { PlayerLayoutMetrics.fromWidth(maxWidth) }
 
         runtime.scope = rememberCoroutineScope()
         runtime.hapticFeedback = LocalHapticFeedback.current
         runtime.gestureController = rememberPlayerGestureController()
         runtime.playerSettingsUiState = playerSettingsUiState
+        runtime.playerDisplayMode = playerDisplayMode
+        if (playerDisplayMode == PlayerDisplayMode.FullscreenLandscape &&
+            runtime.playerFullscreenRequested
+        ) {
+            // Fullscreen is the baseline there; the manual flag only exists for embedded mode.
+            runtime.playerFullscreenRequested = false
+        }
         runtime.p2pSettingsUiState = p2pSettingsUiState
         runtime.p2pStreamingState = p2pStreamingState
         runtime.metaScreenSettingsUiState = metaScreenSettingsUiState
@@ -136,7 +157,16 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
         val keepScreenAwake = runtime.errorMessage == null &&
             (runtime.playbackSnapshot.isPlaying ||
                 (runtime.shouldPlay && runtime.playbackSnapshot.isLoading))
-        EnterImmersivePlayerMode(keepScreenAwake = keepScreenAwake)
+        // System bars and the landscape lock are only taken over in fullscreen; embedded mode
+        // still keeps the screen awake so playback does not sleep mid-episode.
+        if (playerDisplayMode == PlayerDisplayMode.FullscreenLandscape ||
+            runtime.playerFullscreenRequested
+        ) {
+            LockPlayerToLandscape()
+            EnterImmersivePlayerMode(keepScreenAwake = keepScreenAwake)
+        } else {
+            KeepPlayerScreenAwake(keepScreenAwake = keepScreenAwake)
+        }
         ManagePlayerPictureInPicture(
             isPlaying = runtime.playbackSnapshot.isPlaying,
             videoSize = IntSize(

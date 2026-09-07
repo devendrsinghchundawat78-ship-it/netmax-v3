@@ -194,9 +194,16 @@ fun NuvioTheme(
     themeMode: ThemeMode = ThemeMode.DARK,
     appTheme: AppTheme = AppTheme.WHITE,
     amoled: Boolean = false,
+    customThemeAccentHex: String = ThemeCustomColor.DEFAULT_ACCENT_HEX,
     content: @Composable () -> Unit,
 ) {
-    val palette = ThemeColors.getColorPalette(appTheme)
+    // AppTheme.CUSTOM is the only palette built at runtime: the colour the user mixed, passed in as
+    // observable state so every change recomposes the app instead of relying on a global read.
+    val palette = if (appTheme == AppTheme.CUSTOM) {
+        ThemeCustomColor.paletteFor(ThemeCustomColor.parseHex(customThemeAccentHex))
+    } else {
+        ThemeColors.getColorPalette(appTheme)
+    }
     val useDarkTheme = themeMode == ThemeMode.DARK
     val colorScheme = buildColorScheme(palette, darkTheme = useDarkTheme, amoled = amoled && useDarkTheme)
     val tokens = defaultNuvioThemeTokens(palette, amoled = amoled && useDarkTheme, colorScheme = colorScheme, darkTheme = useDarkTheme)

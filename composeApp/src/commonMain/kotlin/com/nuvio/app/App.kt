@@ -94,8 +94,17 @@ internal fun AppEnvironment(content: @Composable () -> Unit) {
     val amoledEnabled by remember {
         ThemeSettingsRepository.amoledEnabled
     }.collectAsStateWithLifecycle()
+    // Observing the colour is what recomposes the whole app when the user applies a custom theme.
+    val customThemeAccent by remember {
+        ThemeSettingsRepository.customThemeAccentHex
+    }.collectAsStateWithLifecycle()
 
-    NuvioTheme(appTheme = selectedTheme, themeMode = themeMode, amoled = amoledEnabled) {
+    NuvioTheme(
+        appTheme = selectedTheme,
+        themeMode = themeMode,
+        amoled = amoledEnabled,
+        customThemeAccentHex = customThemeAccent,
+    ) {
         content()
     }
 }

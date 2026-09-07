@@ -3,6 +3,7 @@ package com.nuvio.app.features.settings
 import com.nuvio.app.core.ui.AppTheme
 import com.nuvio.app.core.ui.NativeTabBridge
 import com.nuvio.app.core.ui.ThemeColors
+import com.nuvio.app.core.ui.ThemeCustomColor
 import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.features.membership.resolveAppTheme
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +25,13 @@ object ThemeSettingsRepository {
 
     private val _amoledEnabled = MutableStateFlow(false)
     val amoledEnabled: StateFlow<Boolean> = _amoledEnabled.asStateFlow()
+
+    /**
+     * The colour behind [AppTheme.CUSTOM] as `#RRGGBB`. Reading it always gives a usable colour:
+     * an empty or malformed stored value falls back to [ThemeCustomColor.DEFAULT_ACCENT_HEX].
+     */
+    private val _customThemeAccentHex = MutableStateFlow(ThemeCustomColor.DEFAULT_ACCENT_HEX)
+    val customThemeAccentHex: StateFlow<String> = _customThemeAccentHex.asStateFlow()
 
     private val _liquidGlassNativeTabBarEnabled = MutableStateFlow(true)
     val liquidGlassNativeTabBarEnabled: StateFlow<Boolean> = _liquidGlassNativeTabBarEnabled.asStateFlow()
@@ -52,6 +60,8 @@ object ThemeSettingsRepository {
         hasLoaded = false
         _selectedThemePreference.value = null
         _selectedTheme.value = AppTheme.WHITE
+        _customThemeAccentHex.value = ThemeCustomColor.DEFAULT_ACCENT_HEX
+        ThemeCustomColor.accentHex = ThemeCustomColor.DEFAULT_ACCENT_HEX
         _themeMode.value = ThemeMode.DARK
         _amoledEnabled.value = false
         _liquidGlassNativeTabBarEnabled.value = false
@@ -74,6 +84,9 @@ object ThemeSettingsRepository {
         } else {
             null
         }
+        val customAccent = ThemeCustomColor.rgbHexOf(ThemeSettingsStorage.loadCustomThemeAccent())
+        _customThemeAccentHex.value = customAccent?.let { "#$it" } ?: ThemeCustomColor.DEFAULT_ACCENT_HEX
+        ThemeCustomColor.accentHex = _customThemeAccentHex.value
         _selectedThemePreference.value = theme
         applyEffectiveTheme()
         _themeMode.value = ThemeMode.fromKey(ThemeSettingsStorage.loadThemeMode())
@@ -93,6 +106,23 @@ object ThemeSettingsRepository {
         _selectedThemePreference.value = theme
         ThemeSettingsStorage.saveSelectedTheme(theme.name)
         applyEffectiveTheme()
+    }
+
+    /**
+     * Stores the user's own theme colour. The value is normalised to `#RRGGBB`; anything that is not a
+     * colour is rejected so a typo in the picker can never leave the app with a broken theme.
+     */
+    fun setCustomThemeAccent(accentHex: String) {
+        ensureLoaded()
+        val normalized = ThemeCustomColor.rgbHexOf(accentHex) ?: return
+        val stored = "#$normalized"
+        if (_customThemeAccentHex.value == stored) return
+        _customThemeAccentHex.value = stored
+        ThemeCustomColor.accentHex = stored
+        ThemeSettingsStorage.saveCustomThemeAccent(stored)
+        if (_selectedTheme.value == AppTheme.CUSTOM) {
+            NativeTabBridge.publishAccentColor(stored)
+        }
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -153,6 +183,7 @@ object ThemeSettingsRepository {
             entitlements = MemberAccessRepository.access.value.entitlements,
         )
         _selectedTheme.value = effective
+        ThemeCustomColor.accentHex = _customThemeAccentHex.value
         NativeTabBridge.publishAccentColor(effective.nativeTabAccentHex())
     }
 }

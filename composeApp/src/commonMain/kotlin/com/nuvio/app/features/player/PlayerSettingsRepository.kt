@@ -91,7 +91,34 @@ data class PlayerSettingsUiState(
     val iosContrast: Int = 0,
     val iosSaturation: Int = 0,
     val iosGamma: Int = 0,
-)
+) {
+    /**
+     * One-switch "Auto play mode" for the Play button.
+     *
+     * ON  -> the existing auto-play policy picks the best ready source and the source picker is
+     *        skipped (that part is already implemented by StreamAutoPlayPolicy / StreamsScreen),
+     *        and the player starts embedded instead of grabbing the whole screen.
+     * OFF -> exactly the pre-existing manual flow: source list first + landscape immersive player.
+     *
+     * Derived from [streamAutoPlayMode] on purpose: no new persisted key and nothing new added to
+     * the settings sync payload, so the provider/data layer keeps its current schema.
+     */
+    val autoPlayModeEnabled: Boolean
+        get() = streamAutoPlayMode != StreamAutoPlayMode.MANUAL
+
+    /** True when the player must open inside the app frame instead of landscape immersive. */
+    val playerOpensEmbedded: Boolean
+        get() = autoPlayModeEnabled
+
+    /**
+     * Derived state of the "Auto pick 480p source" (data saver) switch in Settings -> Playback:
+     * ON makes the automatic pick take an SD (480p) source instead of the first / highest
+     * quality one. Backed by the existing [streamAutoPlaySource] value
+     * [StreamAutoPlaySource.LOWEST_QUALITY_SD], so no new storage key and no new sync payload.
+     */
+    val streamAutoPlayPreferSd480p: Boolean
+        get() = streamAutoPlaySource == StreamAutoPlaySource.LOWEST_QUALITY_SD
+}
 
 object PlayerSettingsRepository {
     private val _uiState = MutableStateFlow(PlayerSettingsUiState())
@@ -123,6 +150,16 @@ object PlayerSettingsRepository {
     private var mapDV7ToHevc = false
     private var tunnelingEnabled = false
     private var streamAutoPlayMode = StreamAutoPlayMode.MANUAL
+
+    /**
+     * In-memory only, deliberately not persisted: the persisted [streamAutoPlayMode] already is the
+     * single source of truth for both the switch and the strategy, so no new storage key is added
+     * and the settings sync payload (provider/data layer) keeps its current schema. On a cold start
+     * the switch simply reflects the persisted mode.
+     */
+    private var rememberedStreamAutoPlayMode: StreamAutoPlayMode? = null
+    /** Source scope remembered while the "prefer 480p" switch temporarily owns [streamAutoPlaySource]. */
+    private var rememberedStreamAutoPlaySource: StreamAutoPlaySource? = null
     private var streamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES
     private var streamAutoPlaySelectedAddons: Set<String> = emptySet()
     private var streamAutoPlaySelectedPlugins: Set<String> = emptySet()
@@ -298,11 +335,16 @@ object PlayerSettingsRepository {
         streamAutoPlayMode = PlayerSettingsStorage.loadStreamAutoPlayMode()
             ?.let { runCatching { StreamAutoPlayMode.valueOf(it) }.getOrNull() }
             ?: StreamAutoPlayMode.MANUAL
-        streamAutoPlaySource = PlayerSettingsStorage.loadStreamAutoPlaySource()
-            ?.let { runCatching { StreamAutoPlaySource.valueOf(it) }.getOrNull() }
-            ?: StreamAutoPlaySource.ALL_SOURCES
+        streamAutoPlaySource = normalizeStreamAutoPlaySource(
+            PlayerSettingsStorage.loadStreamAutoPlaySource()
+                ?.let { runCatching { StreamAutoPlaySource.valueOf(it) }.getOrNull() }
+                ?: StreamAutoPlaySource.ALL_SOURCES,
+        )
         streamAutoPlaySelectedAddons = PlayerSettingsStorage.loadStreamAutoPlaySelectedAddons() ?: emptySet()
         streamAutoPlaySelectedPlugins = PlayerSettingsStorage.loadStreamAutoPlaySelectedPlugins() ?: emptySet()
+        if (streamAutoPlaySource == StreamAutoPlaySource.LOWEST_QUALITY_SD) {
+            rememberedStreamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES
+        }
         if (!AppFeaturePolicy.pluginsEnabled) {
             val normalizedSource = normalizeStreamAutoPlaySource(streamAutoPlaySource)
             if (normalizedSource != streamAutoPlaySource) {
@@ -586,10 +628,31 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveTunnelingEnabled(enabled)
     }
 
+    /**
+     * The "Auto play mode" switch in Playback settings. On = activate the auto-play strategy
+     * (the last one the user configured, defaulting to first source); off = MANUAL. Only
+     * [streamAutoPlayMode] is written, so the regex pattern, source scoping and binge-group
+     * preferences survive every toggle.
+     */
+    fun setAutoPlayModeEnabled(enabled: Boolean) {
+        setStreamAutoPlayMode(
+            if (enabled) {
+                rememberedStreamAutoPlayMode ?: StreamAutoPlayMode.FIRST_STREAM
+            } else {
+                StreamAutoPlayMode.MANUAL
+            }
+        )
+    }
+
     fun setStreamAutoPlayMode(mode: StreamAutoPlayMode) {
         ensureLoaded()
         if (streamAutoPlayMode == mode) return
         streamAutoPlayMode = mode
+        // Remember the strategy the user picked, so the "Auto play mode" switch can hand the exact
+        // same mode back when it is turned on again. The switch itself writes MANUAL, so that value
+        // must keep the memory intact; switching to MANUAL from the mode dialog means the same
+        // thing (auto play off), so nothing needs remembering there either.
+        if (mode != StreamAutoPlayMode.MANUAL) rememberedStreamAutoPlayMode = mode
         publish()
         PlayerSettingsStorage.saveStreamAutoPlayMode(mode.name)
     }
@@ -598,6 +661,10 @@ object PlayerSettingsRepository {
         ensureLoaded()
         val normalizedSource = normalizeStreamAutoPlaySource(source)
         if (streamAutoPlaySource == normalizedSource) return
+        // Remembering the dialog choice lets the "auto pick 480p" switch give the scope back on OFF.
+        if (normalizedSource != StreamAutoPlaySource.LOWEST_QUALITY_SD) {
+            rememberedStreamAutoPlaySource = normalizedSource
+        }
         streamAutoPlaySource = normalizedSource
         publish()
         PlayerSettingsStorage.saveStreamAutoPlaySource(normalizedSource.name)
@@ -977,11 +1044,40 @@ object PlayerSettingsRepository {
         )
     }
 
-    private fun normalizeStreamAutoPlaySource(source: StreamAutoPlaySource): StreamAutoPlaySource {
-        return if (!AppFeaturePolicy.pluginsEnabled && source == StreamAutoPlaySource.ENABLED_PLUGINS_ONLY) {
-            StreamAutoPlaySource.ALL_SOURCES
+    /**
+     * Turns the "auto pick 480p" (data saver) switch on/off. ON remembers the current source
+     * scope and swaps the auto play scope to [StreamAutoPlaySource.LOWEST_QUALITY_SD]; OFF
+     * restores the remembered scope. Only [streamAutoPlaySource] is written, so the settings
+     * storage and sync payload keep their current shape.
+     */
+    fun setStreamAutoPlayPreferSd480p(enabled: Boolean) {
+        ensureLoaded()
+        if (enabled == (streamAutoPlaySource == StreamAutoPlaySource.LOWEST_QUALITY_SD)) return
+        if (enabled) {
+            rememberedStreamAutoPlaySource = streamAutoPlaySource
+            streamAutoPlaySource = StreamAutoPlaySource.LOWEST_QUALITY_SD
         } else {
-            source
+            streamAutoPlaySource =
+                rememberedStreamAutoPlaySource?.takeIf { it != StreamAutoPlaySource.LOWEST_QUALITY_SD }
+                    ?: StreamAutoPlaySource.ALL_SOURCES
         }
+        publish()
+        PlayerSettingsStorage.saveStreamAutoPlaySource(streamAutoPlaySource.name)
+    }
+
+    /**
+     * The data saver scope is a pick rule and is never offered in the source-scope dialog;
+     * a legacy/unknown value still falls back to "all sources".
+     */
+    private fun normalizeStreamAutoPlaySource(source: StreamAutoPlaySource): StreamAutoPlaySource {
+        val recognised = source == StreamAutoPlaySource.ALL_SOURCES ||
+            source == StreamAutoPlaySource.INSTALLED_ADDONS_ONLY ||
+            source == StreamAutoPlaySource.ENABLED_PLUGINS_ONLY ||
+            source == StreamAutoPlaySource.LOWEST_QUALITY_SD
+        if (!recognised) return StreamAutoPlaySource.ALL_SOURCES
+        if (!AppFeaturePolicy.pluginsEnabled && source == StreamAutoPlaySource.ENABLED_PLUGINS_ONLY) {
+            return StreamAutoPlaySource.ALL_SOURCES
+        }
+        return source
     }
 }

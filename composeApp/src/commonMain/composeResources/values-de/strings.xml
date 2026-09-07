@@ -814,6 +814,7 @@
     <string name="theme_rose">Rose</string>
     <string name="theme_violet">Violett</string>
     <string name="theme_white">Weiß</string>
+    <string name="theme_custom">Eigene Farbe</string>
     <string name="player_next_episode">Nächste Episode</string>
     <string name="player_next_episode_finding_source">Quelle wird gesucht…</string>
     <string name="player_next_episode_playing_via_countdown">Abspielen über %1$s in %2$d…</string>

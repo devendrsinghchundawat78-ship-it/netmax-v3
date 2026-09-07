@@ -291,6 +291,62 @@ class StreamAutoPlaySelectorTest {
         assertEquals(stream, selected)
     }
 
+
+    @Test
+    fun `data saver scope picks the 480p source instead of the first one`() {
+        val hd = stream(addonName = "AddonA", url = "https://example.com/hd.mp4", name = "1080p WEB-DL")
+        val small = stream(addonName = "AddonB", url = "https://example.com/sd.mp4", name = "720p WEB")
+        val sd = stream(addonName = "AddonC", url = "https://example.com/sd-480.mp4", name = "480p x264")
+
+        val selected = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(hd, small, sd),
+            mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "",
+            source = StreamAutoPlaySource.LOWEST_QUALITY_SD,
+            installedAddonNames = setOf("AddonA", "AddonB", "AddonC"),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+        )
+
+        assertEquals(sd, selected)
+    }
+
+    @Test
+    fun `data saver scope falls back to the smallest quality when no 480p exists`() {
+        val first = stream(addonName = "AddonA", url = "https://example.com/4k.mp4", name = "2160p REMUX")
+        val small = stream(addonName = "AddonB", url = "https://example.com/hd.mp4", name = "720p WEB")
+
+        val selected = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(first, small),
+            mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "",
+            source = StreamAutoPlaySource.LOWEST_QUALITY_SD,
+            installedAddonNames = setOf("AddonA", "AddonB"),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+        )
+
+        assertEquals(small, selected)
+    }
+
+    @Test
+    fun `all sources scope still picks the first ready source`() {
+        val first = stream(addonName = "AddonA", url = "https://example.com/hd.mp4", name = "1080p WEB-DL")
+        val sd = stream(addonName = "AddonB", url = "https://example.com/sd.mp4", name = "480p x264")
+
+        val selected = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(first, sd),
+            mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "",
+            source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = setOf("AddonA", "AddonB"),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+        )
+
+        assertEquals(first, selected)
+    }
+
     private fun stream(
         addonName: String,
         url: String? = null,

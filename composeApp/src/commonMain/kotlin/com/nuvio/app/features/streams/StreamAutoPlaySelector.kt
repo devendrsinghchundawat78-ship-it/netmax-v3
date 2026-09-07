@@ -77,8 +77,21 @@ object StreamAutoPlaySelector {
     ): StreamAutoPlayEvaluation {
         if (streams.isEmpty()) return StreamAutoPlayEvaluation()
 
+        val sdFirst = source == StreamAutoPlaySource.LOWEST_QUALITY_SD
+
+        // Data saver mode: an SD (480p) source wins over the first/high quality one.
+        // An unnamed source keeps its original position, so a list without any
+        // resolution label still behaves exactly like before.
+        fun List<StreamItem>.lowestQualityFirst(): List<StreamItem> =
+            if (!sdFirst) this else sortedWith(
+                compareBy<StreamItem> { stream ->
+                    if (StreamQualityHints.scoreOf(stream) == 1) 1 else 0
+                }.thenBy { StreamQualityHints.scoreOf(it) },
+            )
+
+        // LOWEST_QUALITY_SD still searches every source; only the pick changes (SD first).
         val sourceScopedStreams = when (source) {
-            StreamAutoPlaySource.ALL_SOURCES -> streams
+            StreamAutoPlaySource.ALL_SOURCES, StreamAutoPlaySource.LOWEST_QUALITY_SD -> streams
             StreamAutoPlaySource.INSTALLED_ADDONS_ONLY -> streams.filter { it.addonName in installedAddonNames }
             StreamAutoPlaySource.ENABLED_PLUGINS_ONLY -> streams.filter { it.addonName !in installedAddonNames }
         }
@@ -105,11 +118,19 @@ object StreamAutoPlaySelector {
             stream.isAutoPlayable(debridEnabled, activeResolverProviderId)
         }
         if (bingeGroupOnly) {
-            val readyStreams = preferredReadyStream?.let(::listOf).orEmpty()
+            val orderedBingeStreams = bingeGroupCandidates.lowestQualityFirst()
+                .filter { it.isAutoPlayable(debridEnabled, activeResolverProviderId) }
+            val readyStreams = if (sdFirst) orderedBingeStreams else listOfNotNull(preferredReadyStream)
+            val selectedBingeStream = if (sdFirst) {
+                orderedBingeStreams.firstOrNull { StreamQualityHints.scoreOf(it) == SD_QUALITY_SCORE }
+                    ?: orderedBingeStreams.firstOrNull()
+            } else {
+                preferredReadyStream
+            }
             return StreamAutoPlayEvaluation(
-                stream = preferredReadyStream,
+                stream = selectedBingeStream,
                 readyStreams = readyStreams,
-                hasPendingDebridCandidate = preferredReadyStream == null &&
+                hasPendingDebridCandidate = selectedBingeStream == null &&
                     bingeGroupCandidates.any {
                         it.isPendingDebridAutoPlay(debridEnabled, activeResolverProviderId)
                     },
@@ -119,7 +140,7 @@ object StreamAutoPlaySelector {
             return StreamAutoPlayEvaluation()
         }
         val preferredStream = if (preferBingeGroupInSelection && targetBingeGroup.isNotEmpty()) {
-            candidateStreams.firstOrNull { stream ->
+            candidateStreams.lowestQualityFirst().firstOrNull { stream ->
                 stream.behaviorHints.bingeGroup == targetBingeGroup &&
                     stream.isAutoPlayable(debridEnabled, activeResolverProviderId)
             }
@@ -173,14 +194,32 @@ object StreamAutoPlaySelector {
         }
         if (matchingStreams.isEmpty() && preferredStream == null) return StreamAutoPlayEvaluation()
 
-        val readyStreams = buildList {
-            preferredStream?.let(::add)
-            matchingStreams
-                .filter { it.isAutoPlayable(debridEnabled, activeResolverProviderId) }
-                .filterNot { it == preferredStream }
-                .forEach(::add)
+        val orderedMatchingStreams = matchingStreams.lowestQualityFirst()
+        val orderedPool = (if (preferredStream != null) {
+            candidateStreams.lowestQualityFirst().filter { it.behaviorHints.bingeGroup == targetBingeGroup } +
+                candidateStreams.filterNot { it.behaviorHints.bingeGroup == targetBingeGroup }
+        } else {
+            candidateStreams.lowestQualityFirst()
+        }).distinct()
+
+        val selected = if (sdFirst) {
+            orderedPool.firstOrNull {
+                it.isAutoPlayable(debridEnabled, activeResolverProviderId) &&
+                    StreamQualityHints.scoreOf(it) == SD_QUALITY_SCORE
+            } ?: orderedPool.firstOrNull { it.isAutoPlayable(debridEnabled, activeResolverProviderId) }
+        } else {
+            preferredStream ?: orderedMatchingStreams.firstOrNull {
+                it.isAutoPlayable(debridEnabled, activeResolverProviderId)
+            }
         }
-        val selected = readyStreams.firstOrNull()
+        // The remaining entries are the sources the player falls back to after a failure, so
+        // they keep the same order (SD first in data saver mode) instead of provider order.
+        val readyStreams = buildList {
+            if (selected != null) add(selected)
+            orderedPool.forEach { stream ->
+                if (stream != selected && stream.isAutoPlayable(debridEnabled, activeResolverProviderId)) add(stream)
+            }
+        }.distinct()
         if (selected != null) {
             return StreamAutoPlayEvaluation(
                 stream = selected,
@@ -225,6 +264,9 @@ object StreamAutoPlaySelector {
         val state = debridCacheStatus?.state
         return state == null || state == StreamDebridCacheState.CHECKING
     }
+
+    /** [StreamQualityHints] score of a 480p/SD source, used by the data saver scope. */
+    private const val SD_QUALITY_SCORE = 2
 
     private fun String?.matchesResolver(activeResolverProviderId: String?): Boolean {
         val active = activeResolverProviderId?.trim().orEmpty()

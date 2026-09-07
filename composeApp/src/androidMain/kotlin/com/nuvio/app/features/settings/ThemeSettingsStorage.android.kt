@@ -16,6 +16,7 @@ import kotlinx.serialization.json.put
 actual object ThemeSettingsStorage {
     private const val preferencesName = "nuvio_theme_settings"
     private const val selectedThemeKey = "selected_theme"
+    private const val customThemeAccentKey = "custom_theme_accent"
     private const val themeModeKey = "theme_mode"
     private const val amoledEnabledKey = "amoled_enabled"
     private const val liquidGlassNativeTabBarEnabledKey = "liquid_glass_native_tab_bar_enabled"
@@ -34,6 +35,7 @@ actual object ThemeSettingsStorage {
     private const val liquidGlassTextColorKey = "liquid_glass_text_color"
     private val profileScopedSyncKeys = listOf(
         selectedThemeKey,
+        customThemeAccentKey,
         themeModeKey,
         amoledEnabledKey,
         liquidGlassNativeTabBarEnabledKey,
@@ -65,6 +67,16 @@ actual object ThemeSettingsStorage {
         preferences
             ?.edit()
             ?.putString(ProfileScopedKey.of(selectedThemeKey), themeName)
+            ?.apply()
+    }
+
+    actual fun loadCustomThemeAccent(): String? =
+        preferences?.getString(ProfileScopedKey.of(customThemeAccentKey), null)
+
+    actual fun saveCustomThemeAccent(accentHex: String) {
+        preferences
+            ?.edit()
+            ?.putString(ProfileScopedKey.of(customThemeAccentKey), accentHex)
             ?.apply()
     }
 
@@ -170,6 +182,7 @@ actual object ThemeSettingsStorage {
 
     actual fun exportToSyncPayload(): JsonObject = buildJsonObject {
         loadSelectedTheme()?.let { put(selectedThemeKey, encodeSyncString(it)) }
+        loadCustomThemeAccent()?.let { put(customThemeAccentKey, encodeSyncString(it)) }
         loadThemeMode()?.let { put(themeModeKey, encodeSyncString(it)) }
         loadAmoledEnabled()?.let { put(amoledEnabledKey, encodeSyncBoolean(it)) }
         loadLiquidGlassNativeTabBarEnabled()?.let { put(liquidGlassNativeTabBarEnabledKey, encodeSyncBoolean(it)) }
@@ -182,6 +195,7 @@ actual object ThemeSettingsStorage {
         }?.apply()
 
         payload.decodeSyncString(selectedThemeKey)?.let(::saveSelectedTheme)
+        payload.decodeSyncString(customThemeAccentKey)?.let(::saveCustomThemeAccent)
         payload.decodeSyncString(themeModeKey)?.let(::saveThemeMode)
         payload.decodeSyncBoolean(amoledEnabledKey)?.let(::saveAmoledEnabled)
         payload.decodeSyncBoolean(liquidGlassNativeTabBarEnabledKey)?.let(::saveLiquidGlassNativeTabBarEnabled)

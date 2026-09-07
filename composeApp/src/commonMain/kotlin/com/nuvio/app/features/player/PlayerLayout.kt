@@ -16,6 +16,18 @@ import nuvio.composeapp.generated.resources.compose_player_resize_zoom
 import org.jetbrains.compose.resources.StringResource
 import kotlin.math.max
 
+/**
+ * How the player is presented on entry. This is presentation only - it never touches the
+ * playback engine, the stream url, or provider/stream selection.
+ */
+internal enum class PlayerDisplayMode {
+    /** Landscape + hidden system bars: the long-standing behaviour. */
+    FullscreenLandscape,
+
+    /** Video stays inside the player container with all controls, plus a Fullscreen button. */
+    Embedded,
+}
+
 internal data class PlayerLayoutMetrics(
     val horizontalPadding: Dp,
     val verticalPadding: Dp,

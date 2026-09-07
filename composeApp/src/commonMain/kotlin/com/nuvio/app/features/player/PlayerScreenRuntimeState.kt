@@ -94,6 +94,16 @@ internal class PlayerScreenRuntime(
 
     var controlsVisible by mutableStateOf(false)
     var playerControlsLocked by mutableStateOf(false)
+
+    /** Entry layout, mirrored from settings by PlayerScreenContent (no extra persistence). */
+    var playerDisplayMode by mutableStateOf(PlayerDisplayMode.FullscreenLandscape)
+
+    /**
+     * Manual fullscreen opt-in, set only by the player's own Fullscreen button and only
+     * reachable when the player opened embedded. Flipping it never touches the engine, so
+     * playback keeps running in both directions.
+     */
+    var playerFullscreenRequested by mutableStateOf(false)
     var activeSourceUrl by mutableStateOf(sourceUrl)
     var activeSourceAudioUrl by mutableStateOf(sourceAudioUrl)
     var activeSourceHeaders by mutableStateOf(sanitizePlaybackHeaders(sourceHeaders))

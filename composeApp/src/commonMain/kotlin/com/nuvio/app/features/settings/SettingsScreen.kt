@@ -154,6 +154,7 @@ fun SettingsScreen(
             ThemeSettingsRepository.selectedTheme
         }.collectAsStateWithLifecycle()
         val themeMode by remember { ThemeSettingsRepository.themeMode }.collectAsStateWithLifecycle()
+        val customThemeAccentHex by remember { ThemeSettingsRepository.customThemeAccentHex }.collectAsStateWithLifecycle()
         val amoledEnabled by remember { ThemeSettingsRepository.amoledEnabled }.collectAsStateWithLifecycle()
         val liquidGlassNativeTabBarEnabled by remember {
             ThemeSettingsRepository.liquidGlassNativeTabBarEnabled
@@ -396,6 +397,7 @@ fun SettingsScreen(
                 libassRenderType = playerSettingsUiState.libassRenderType,
                 rememberLastProfileEnabled = profileSettingsState.rememberLastProfileEnabled,
                 selectedTheme = selectedTheme,
+                customThemeAccentHex = customThemeAccentHex,
                 themeMode = themeMode,
                 onThemeSelected = ThemeSettingsRepository::setTheme,
                 amoledEnabled = amoledEnabled,
@@ -464,6 +466,7 @@ fun SettingsScreen(
                 libassRenderType = playerSettingsUiState.libassRenderType,
                 rememberLastProfileEnabled = profileSettingsState.rememberLastProfileEnabled,
                 selectedTheme = selectedTheme,
+                customThemeAccentHex = customThemeAccentHex,
                 themeMode = themeMode,
                 onThemeSelected = ThemeSettingsRepository::setTheme,
                 amoledEnabled = amoledEnabled,
@@ -541,6 +544,7 @@ private fun MobileSettingsScreen(
     libassRenderType: String,
     rememberLastProfileEnabled: Boolean,
     selectedTheme: AppTheme,
+    customThemeAccentHex: String,
     themeMode: ThemeMode,
     onThemeSelected: (AppTheme) -> Unit,
     amoledEnabled: Boolean,
@@ -747,6 +751,7 @@ private fun MobileSettingsScreen(
                 SettingsPage.Appearance -> appearanceSettingsContent(
                     isTablet = false,
                     selectedTheme = selectedTheme,
+                    customThemeAccentHex = customThemeAccentHex,
                     themeMode = themeMode,
                     onThemeModeSelected = ThemeSettingsRepository::setThemeMode,
                     onThemeSelected = onThemeSelected,
@@ -914,6 +919,7 @@ private fun TabletSettingsScreen(
     libassRenderType: String,
     rememberLastProfileEnabled: Boolean,
     selectedTheme: AppTheme,
+    customThemeAccentHex: String,
     themeMode: ThemeMode,
     onThemeSelected: (AppTheme) -> Unit,
     amoledEnabled: Boolean,
@@ -1175,6 +1181,7 @@ private fun TabletSettingsScreen(
                     SettingsPage.Appearance -> appearanceSettingsContent(
                         isTablet = true,
                         selectedTheme = selectedTheme,
+                        customThemeAccentHex = customThemeAccentHex,
                         themeMode = themeMode,
                         onThemeModeSelected = ThemeSettingsRepository::setThemeMode,
                         onThemeSelected = onThemeSelected,

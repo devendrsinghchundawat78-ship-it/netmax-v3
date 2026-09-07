@@ -2,6 +2,7 @@ package com.nuvio.app.features.membership
 
 import com.nuvio.app.core.ui.AppTheme
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -19,6 +20,15 @@ class ThemeAccessTest {
             AppTheme.WHITE,
             resolveAppTheme(AppTheme.JADE, CosmeticEntitlements.None),
         )
+    }
+
+    @Test
+    fun customThemeIsAlwaysAvailableAndListedLast() {
+        val themes = availableAppThemes(CosmeticEntitlements.None)
+
+        assertContains(themes, AppTheme.CUSTOM)
+        assertEquals(AppTheme.CUSTOM, themes.last())
+        assertEquals(AppTheme.CUSTOM, resolveAppTheme(AppTheme.CUSTOM, CosmeticEntitlements.None))
     }
 
     @Test

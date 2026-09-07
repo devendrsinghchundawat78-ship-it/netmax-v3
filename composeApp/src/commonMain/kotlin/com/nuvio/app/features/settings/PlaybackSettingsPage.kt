@@ -754,6 +754,24 @@ private fun PlaybackSettingsSection(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_auto_play_mode),
+                    description = stringResource(Res.string.settings_playback_auto_play_mode_description),
+                    checked = autoPlayPlayerSettings.autoPlayModeEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setAutoPlayModeEnabled,
+                )
+                if (autoPlayPlayerSettings.autoPlayModeEnabled) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_auto_pick_480p),
+                        description = stringResource(Res.string.settings_playback_auto_pick_480p_description),
+                        checked = autoPlayPlayerSettings.streamAutoPlayPreferSd480p,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayPreferSd480p,
+                    )
+                }
+                SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_stream_selection_mode),
                     description = stringResource(autoPlayPlayerSettings.streamAutoPlayMode.labelRes),
@@ -3437,6 +3455,8 @@ private fun StreamAutoPlaySource.labelRes(pluginsEnabled: Boolean): StringResour
         else Res.string.settings_playback_source_scope_all_addons
     StreamAutoPlaySource.INSTALLED_ADDONS_ONLY -> Res.string.settings_playback_source_scope_installed_addons_only
     StreamAutoPlaySource.ENABLED_PLUGINS_ONLY -> Res.string.settings_playback_source_scope_enabled_plugins_only
+    // Only ever reached through the "Auto pick 480p source" switch; the dialog never lists it.
+    StreamAutoPlaySource.LOWEST_QUALITY_SD -> Res.string.settings_playback_source_scope_lowest_quality_sd
 }
 
 private val StreamAutoPlayMode.labelRes: StringResource

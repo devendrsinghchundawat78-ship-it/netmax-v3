@@ -2,15 +2,22 @@ package com.nuvio.app.features.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,7 +29,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,8 +42,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,6 +65,7 @@ import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.core.ui.labelRes
 import com.nuvio.app.core.ui.ThemeColors
+import com.nuvio.app.core.ui.ThemeCustomColor
 import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.features.membership.availableAppThemes
@@ -88,6 +108,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 internal fun LazyListScope.appearanceSettingsContent(
     isTablet: Boolean,
     selectedTheme: AppTheme,
+    customThemeAccentHex: String,
     themeMode: ThemeMode,
     onThemeModeSelected: (ThemeMode) -> Unit,
     onThemeSelected: (AppTheme) -> Unit,
@@ -116,6 +137,7 @@ internal fun LazyListScope.appearanceSettingsContent(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
+                var showCustomThemeSheet by remember { mutableStateOf(false) }
                 val memberAccess by remember {
                     MemberAccessRepository.ensureStarted()
                     MemberAccessRepository.access
@@ -150,8 +172,17 @@ internal fun LazyListScope.appearanceSettingsContent(
                                 rowThemes.forEach { theme ->
                                     ThemeChip(
                                         theme = theme,
+                                        customAccentHex = customThemeAccentHex,
                                         isSelected = theme == selectedTheme,
-                                        onClick = { onThemeSelected(theme) },
+                                        onClick = {
+                                            if (theme == AppTheme.CUSTOM) {
+                                                // Tapping "Custom" opens the mixer; the theme is only
+                                                // switched once a colour has actually been applied.
+                                                showCustomThemeSheet = true
+                                            } else {
+                                                onThemeSelected(theme)
+                                            }
+                                        },
                                         modifier = Modifier.weight(1f),
                                     )
                                 }
@@ -161,6 +192,20 @@ internal fun LazyListScope.appearanceSettingsContent(
                             }
                         }
                     }
+                }
+                if (showCustomThemeSheet) {
+                    CustomThemeColorSheet(
+                        initialAccentHex = customThemeAccentHex,
+                        isTablet = isTablet,
+                        onApply = { accentHex ->
+                            // Publish the colour and switch to it in one go, so a cancelled sheet never
+                            // leaves the app on a half-configured custom theme.
+                            ThemeSettingsRepository.setCustomThemeAccent(accentHex)
+                            onThemeSelected(AppTheme.CUSTOM)
+                            showCustomThemeSheet = false
+                        },
+                        onDismiss = { showCustomThemeSheet = false },
+                    )
                 }
             }
         }
@@ -363,6 +408,375 @@ internal fun LazyListScope.appearanceSettingsContent(
     }
 }
 
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CustomThemeColorSheet(
+    initialAccentHex: String,
+    onApply: (String) -> Unit,
+    onDismiss: () -> Unit,
+    isTablet: Boolean = false,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val coroutineScope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val dismissSheet: () -> Unit = {
+        coroutineScope.launch { dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss) }
+    }
+
+    // Local draft: nothing reaches the app theme (or storage) until "Save" is tapped.
+    var accent by remember {
+        mutableStateOf(ThemeCustomColor.parseHex(initialAccentHex))
+    }
+    var hexText by remember {
+        mutableStateOf(ThemeCustomColor.encodeHex(ThemeCustomColor.parseHex(initialAccentHex)))
+    }
+    var hexError by remember { mutableStateOf(false) }
+
+    fun select(color: Color) {
+        accent = color
+        hexText = ThemeCustomColor.encodeHex(color)
+        hexError = false
+    }
+
+    val preview = remember(accent) { ThemeCustomColor.paletteFor(accent) }
+
+    NuvioModalBottomSheet(
+        onDismissRequest = { dismissSheet() },
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = if (isTablet) 28.dp else 20.dp,
+                    vertical = 8.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(
+                text = stringResource(Res.string.settings_appearance_custom_theme_sheet_title),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(Res.string.settings_appearance_custom_theme_description),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            // --- what the app looks like with this colour ---
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(66.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(preview.background),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(preview.secondary)
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.settings_appearance_custom_theme_preview_label),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = preview.onSecondary,
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(66.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(preview.secondary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = ThemeCustomColor.encodeHex(accent),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = preview.onSecondary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+
+            // --- quick starting points ---
+            Text(
+                text = stringResource(Res.string.settings_appearance_custom_theme_presets),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            customThemeColorPresets.chunked(6).forEach { rowColors ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    rowColors.forEach { preset ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .aspectRatio(1f)
+                                .clip(CircleShape)
+                                .background(preset)
+                                .border(
+                                    width = if (ThemeCustomColor.encodeHex(preset) == hexText.uppercase()) 2.dp else 0.dp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = CircleShape,
+                                )
+                                .clickable { select(preset) },
+                        )
+                    }
+                    repeat(6 - rowColors.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+
+            // --- hue ---
+            Text(
+                text = stringResource(Res.string.settings_appearance_custom_theme_hue),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            CustomThemeHueBar(
+                hueDegrees = ThemeCustomColor.hueOf(accent),
+                onHueChange = { hue ->
+                    val (saturation, brightness) = ThemeCustomColor.saturationBrightnessOf(accent)
+                    select(ThemeCustomColor.colorFrom(hue, saturation, brightness))
+                },
+            )
+
+            // --- shade: saturation across, brightness down ---
+            Text(
+                text = stringResource(Res.string.settings_appearance_custom_theme_shade),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            CustomThemeShadePanel(
+                hueDegrees = ThemeCustomColor.hueOf(accent),
+                saturation = ThemeCustomColor.saturationBrightnessOf(accent).first,
+                brightness = ThemeCustomColor.saturationBrightnessOf(accent).second,
+                onShadeChange = { saturation, brightness ->
+                    select(ThemeCustomColor.colorFrom(ThemeCustomColor.hueOf(accent), saturation, brightness))
+                },
+            )
+
+            // --- exact value ---
+            Text(
+                text = stringResource(Res.string.settings_appearance_custom_theme_hex),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                border = BorderStroke(
+                    1.dp,
+                    if (hexError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                ),
+            ) {
+                BasicTextField(
+                    value = hexText,
+                    onValueChange = { raw ->
+                        val trimmed = raw.take(7)
+                        hexText = trimmed
+                        val parsed = ThemeCustomColor.decodeHex(trimmed)
+                        if (parsed != null) {
+                            accent = parsed
+                            hexError = false
+                        } else {
+                            hexError = trimmed.isNotBlank()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    decorationBox = { innerTextField ->
+                        if (hexText.isBlank()) {
+                            Text(
+                                text = stringResource(Res.string.settings_appearance_custom_theme_hex_placeholder),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            )
+                        }
+                        innerTextField()
+                    },
+                )
+            }
+            if (hexError) {
+                Text(
+                    text = stringResource(Res.string.settings_appearance_custom_theme_invalid_hex),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    onClick = {
+                        focusManager.clearFocus()
+                        dismissSheet()
+                    },
+                ) {
+                    Text(stringResource(Res.string.action_cancel))
+                }
+                TextButton(
+                    onClick = {
+                        focusManager.clearFocus()
+                        onApply(ThemeCustomColor.DEFAULT_ACCENT_HEX)
+                    },
+                ) {
+                    Text(stringResource(Res.string.action_reset))
+                }
+                TextButton(
+                    enabled = !hexError && hexText.isNotBlank(),
+                    onClick = {
+                        focusManager.clearFocus()
+                        val parsed = ThemeCustomColor.decodeHex(hexText)
+                        if (parsed == null) {
+                            hexError = true
+                        } else {
+                            onApply(ThemeCustomColor.encodeHex(parsed))
+                        }
+                    },
+                ) {
+                    Text(stringResource(Res.string.action_save))
+                }
+            }
+        }
+    }
+}
+
+/** The picked colour's row: full spectrum at full brightness, the same order the mixer uses. */
+private val customThemeColorPresets: List<Color> = listOf(
+    Color(0xFFE53935uL),
+    Color(0xFFFB8C00uL),
+    Color(0xFFFDD835uL),
+    Color(0xFF43A047uL),
+    Color(0xFF22D37CuL),
+    Color(0xFF00ACC1uL),
+    Color(0xFF1E88E5uL),
+    Color(0xFF3185F5uL),
+    Color(0xFF5E35B1uL),
+    Color(0xFF8E24AAuL),
+    Color(0xFFD81B60uL),
+    Color(0xFFEC70A9uL),
+    Color(0xFF8D6E63uL),
+    Color(0xFFAAB2BEuL),
+    Color(0xFFF5F5F5uL),
+    Color(0xFF1A1A1AuL),
+)
+
+private val hueSpectrumColors: List<Color> = listOf(
+    0f, 30f, 60f, 90f, 120f, 150f, 180f, 210f, 240f, 270f, 300f, 330f, 360f,
+).map { ThemeCustomColor.colorFrom(it, 1f, 1f) }
+
+@Composable
+private fun CustomThemeHueBar(
+    hueDegrees: Float,
+    onHueChange: (Float) -> Unit,
+) {
+    var barSize by remember { mutableStateOf(Size.Zero) }
+    val fraction = (hueDegrees / 360f).coerceIn(0f, 1f)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(30.dp)
+            .clip(RoundedCornerShape(15.dp))
+            .background(Brush.horizontalGradient(hueSpectrumColors))
+            .onSizeChanged { barSize = Size(it.width.toFloat(), it.height.toFloat()) }
+            .pointerInput(barSize) {
+                fun update(position: Offset) {
+                    if (barSize.width <= 0f) return
+                    onHueChange((position.x / barSize.width).coerceIn(0f, 1f) * 360f)
+                }
+                detectTapGestures(onPress = { update(it) })
+                detectHorizontalDragGestures { change, _ ->
+                    update(change.position)
+                    change.consume()
+                }
+            },
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .aspectRatio(1f)
+                .padding(3.dp)
+                .offset(x = (barSize.width * fraction - with(LocalDensity.current) { 15.dp.toPx() }).coerceAtLeast(0f))
+                .clip(CircleShape)
+                .background(Color.White)
+                .border(2.dp, Color.Black.copy(alpha = 0.35f), CircleShape),
+        )
+    }
+}
+
+@Composable
+private fun CustomThemeShadePanel(
+    hueDegrees: Float,
+    saturation: Float,
+    brightness: Float,
+    onShadeChange: (Float, Float) -> Unit,
+) {
+    var panelSize by remember { mutableStateOf(Size.Zero) }
+    val pure = ThemeCustomColor.colorFrom(hueDegrees, 1f, 1f)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1.9f)
+            .clip(RoundedCornerShape(14.dp))
+            .background(pure)
+            .background(Brush.verticalGradient(listOf(Color.White, Color.Transparent, Color.Black)))
+            .onSizeChanged { panelSize = Size(it.width.toFloat(), it.height.toFloat()) }
+            .pointerInput(panelSize, hueDegrees) {
+                fun update(position: Offset) {
+                    if (panelSize.width <= 0f || panelSize.height <= 0f) return
+                    onShadeChange(
+                        (position.x / panelSize.width).coerceIn(0f, 1f),
+                        1f - (position.y / panelSize.height).coerceIn(0f, 1f),
+                    )
+                }
+                detectTapGestures(onPress = { update(it) })
+                detectDragGestures { change, _ ->
+                    update(change.position)
+                    change.consume()
+                }
+            },
+    ) {
+        val density = LocalDensity.current
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .offset(
+                    x = with(density) { (panelSize.width * saturation).toDp() },
+                    y = with(density) { (panelSize.height * (1f - brightness)).toDp() },
+                )
+                .clip(CircleShape)
+                .border(2.dp, Color.White, CircleShape)
+                .border(3.dp, Color.Black.copy(alpha = 0.3f), CircleShape),
+        )
+    }
+}
+
 private data class AppLanguageSheetOption(
     val language: AppLanguage,
     val labelRes: StringResource,
@@ -442,8 +856,13 @@ private fun ThemeChip(
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    customAccentHex: String = ThemeCustomColor.DEFAULT_ACCENT_HEX,
 ) {
-    val palette = ThemeColors.getColorPalette(theme)
+    val palette = if (theme == AppTheme.CUSTOM) {
+        ThemeCustomColor.paletteFor(ThemeCustomColor.parseHex(customAccentHex))
+    } else {
+        ThemeColors.getColorPalette(theme)
+    }
 
     Column(
         modifier = modifier

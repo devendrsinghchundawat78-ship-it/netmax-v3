@@ -276,9 +276,22 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             onLockToggle = {
                 if (playerControlsLocked) unlockPlayerControls() else lockPlayerControls()
             },
+            isFullscreen = runtime.playerFullscreenRequested ||
+                runtime.playerDisplayMode == PlayerDisplayMode.FullscreenLandscape,
+            canLeaveFullscreen = runtime.playerDisplayMode == PlayerDisplayMode.Embedded,
+            onFullscreenToggle = {
+                runtime.playerFullscreenRequested = !runtime.playerFullscreenRequested
+                controlsVisible = true
+            },
             onBack = {
-                flushWatchProgress()
-                args.onBack()
+                if (runtime.playerFullscreenRequested) {
+                    // Back from manual fullscreen drops straight into the embedded player;
+                    // playback was never paused, so the video simply continues there.
+                    runtime.playerFullscreenRequested = false
+                } else {
+                    flushWatchProgress()
+                    args.onBack()
+                }
             },
             onTogglePlayback = { togglePlayback() },
             onSeekBack = { seekBy(-10_000L) },

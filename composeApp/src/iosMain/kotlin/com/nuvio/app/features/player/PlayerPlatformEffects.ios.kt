@@ -45,6 +45,23 @@ actual fun EnterImmersivePlayerMode(keepScreenAwake: Boolean) {
     }
 }
 
+/**
+ * Embedded mode on iOS must not disable the idle timer through [EnterImmersivePlayerMode] (that
+ * call also owns the "unlock orientation" notification on dispose), so keep the screen awake here.
+ */
+@Composable
+actual fun KeepPlayerScreenAwake(keepScreenAwake: Boolean) {
+    SideEffect {
+        UIApplication.sharedApplication.setIdleTimerDisabled(keepScreenAwake)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            UIApplication.sharedApplication.setIdleTimerDisabled(false)
+        }
+    }
+}
+
 @Composable
 actual fun ManagePlayerPictureInPicture(
     isPlaying: Boolean,

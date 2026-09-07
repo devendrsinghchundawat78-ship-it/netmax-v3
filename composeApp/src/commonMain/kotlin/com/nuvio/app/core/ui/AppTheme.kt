@@ -3,6 +3,7 @@ package com.nuvio.app.core.ui
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.theme_amber
 import nuvio.composeapp.generated.resources.theme_crimson
+import nuvio.composeapp.generated.resources.theme_custom
 import nuvio.composeapp.generated.resources.theme_emerald
 import nuvio.composeapp.generated.resources.theme_ocean
 import nuvio.composeapp.generated.resources.theme_rose
@@ -28,6 +29,12 @@ enum class AppTheme {
     AMBER,
     ROSE,
     WHITE,
+
+    /**
+     * The user's own colour (Settings -> Appearance -> theme row "Custom"). Its palette is derived at
+     * runtime from [ThemeCustomColor.accentHex], so it is not a fixed set of values like the presets.
+     */
+    CUSTOM,
 }
 
 val AppTheme.labelRes: StringResource
@@ -44,4 +51,5 @@ val AppTheme.labelRes: StringResource
         AppTheme.AMBER -> Res.string.theme_amber
         AppTheme.ROSE -> Res.string.theme_rose
         AppTheme.WHITE -> Res.string.theme_white
+        AppTheme.CUSTOM -> Res.string.theme_custom
     }
