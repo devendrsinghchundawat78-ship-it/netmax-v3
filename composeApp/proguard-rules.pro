@@ -91,3 +91,33 @@
 -keep class com.fleeksoft.ksoup.** { *; }
 -dontwarn com.fleeksoft.ksoup.**
 
+# Keep kotlinx.serialization's generated serializer so the AI/history payloads
+# keep deserialising in minified release builds (R8 full mode can drop it and
+# then every @Serializable decode throws at runtime).
+-keepclassmembers @kotlinx.serialization.Serializable class * {
+    *** INSTANCE;
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keepclassmembers class *$$serializer {
+    ** INSTANCE;
+}
+-if @kotlinx.serialization.Serializable class **
+-keepclassmembers class <1> {
+    static <1>$Companion Companion;
+}
+-keepclassmembers class kotlinx.serialization.json.** {
+    *** Companion;
+}
+-keepclasseswithmembers class kotlinx.serialization.json.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# NetMax AI screen: same R8 hardening already applied to StreamsScreenKt/PlayerScreenKt.
+# The whole chat is one large composable with nested lambdas and a keyed LazyColumn; R8
+# inlining/merging could produce verifier-invalid bytecode, which fatal-crashes the screen
+# the moment it is opened from the Home FAB or Settings.
+-keep class com.nuvio.app.features.netmax.NetmaxAiScreenKt { *; }
+-keep class com.nuvio.app.features.netmax.NetmaxAiScreenKt$* { *; }
+-keep class com.nuvio.app.features.netmax.NetmaxAiService { *; }
+-keep class com.nuvio.app.features.netmax.AiHistoryMessage { *; }
+-keep class com.nuvio.app.features.netmax.AiHistoryMessage$* { *; }

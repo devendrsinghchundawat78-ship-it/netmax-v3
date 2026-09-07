@@ -8,24 +8,30 @@
 //     (OPENROUTER_API_KEY) — it is never sent to, or stored by, the app.
 //   • The user identity is taken from the verified Supabase JWT — the
 //     client-sent user_id is never trusted.
-//   • 10 requests/user/day is enforced by the ATOMIC database function
-//     increment_ai_usage() — concurrent requests cannot bypass it.
+//   • A valid session is not required: without one the caller becomes a
+//     "guest", whose identity is a uuid derived from the device's guestId, so
+//     the assistant answers and stores per-device history when the project
+//     allows it (RLS/service role) and degrades to a stateless reply when it
+//     does not.
+//   • There is no per-day request cap any more. increment_ai_usage() is still
+//     called (best effort) so the admin usage tables keep their numbers; a
+//     failure to record never blocks a reply.
 //
 // Deploy:
 //   npx supabase functions deploy netmax-ai
-//   (JWT verification stays ON at the gateway — the app always sends a
-//    valid user token; this function re-verifies it anyway.)
+//   Optional but recommended:
+//     supabase functions secrets set SUPABASE_SERVICE_ROLE_KEY=...   (guest history/requests)
+//     dashboard → Authentication → Providers → Anonymous sign-ins ON (guests get a real user)
 //
 // Protocol (POST, JSON body):
 //   { action: "chat", message, conversationId?, imageBase64?, imageMimeType?,
-//     clientContext?, device? }
-//   { action: "submit", type, payload, conversationId? }
-//   { action: "history" }
+//     clientContext?, device?, guestId? }
+//   { action: "submit", type, payload, conversationId?, guestId? }
+//   { action: "history", guestId? }
 // =====================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
-  DAILY_LIMIT,
   MAX_MESSAGE_CHARS,
   MAX_IMAGE_BASE64_BYTES,
   buildSystemPrompt,
@@ -80,8 +86,49 @@ async function authenticate(req: Request): Promise<AuthedContext | null> {
   return { userId: data.user.id, supabase };
 }
 
-function usageOf(count: number): { used: number; limit: number; remaining: number } {
-  return { used: count, limit: DAILY_LIMIT, remaining: Math.max(0, DAILY_LIMIT - count) };
+interface Caller {
+  userId: string;
+  supabase: ReturnType<typeof createClient>;
+  /** true when the request carried no verifiable session. */
+  isGuest: boolean;
+}
+
+/**
+ * Deterministic uuid5-style id from a seed, so the same device keeps the same
+ * synthetic user across launches (the uuid columns require a valid uuid).
+ */
+async function uuidFromSeed(seed: string): Promise<string> {
+  const digest = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed))
+  );
+  const hex = Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
+  const versioned = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-` +
+    ((parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, '0') +
+    hex.slice(18, 20) + `-${hex.slice(20, 32)}`;
+  return versioned.toLowerCase();
+}
+
+/**
+ * Signed-in callers keep the existing verified-JWT path. Everyone else is a guest:
+ * no session means no RLS, so the service-role client is used when the deployment
+ * provides one, and the caller's `guestId` becomes the user id.
+ */
+async function resolveCaller(req: Request, body: Record<string, unknown>): Promise<Caller> {
+  const authed = await authenticate(req);
+  if (authed) return { ...authed, isGuest: false };
+
+  const raw = typeof body.guestId === 'string' ? body.guestId.trim() : '';
+  const userId = await uuidFromSeed(`netmax-guest:${raw || 'unknown-device'}`);
+  const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const supabase = createClient(SUPABASE_URL, serviceRole || SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return { userId, supabase, isGuest: true };
+}
+
+/** `limit: -1` is the "no cap" marker the app renders as "unlimited". */
+function usageOf(count: number): { used: number; limit: number; remaining: number; unlimited: boolean } {
+  return { used: count, limit: -1, remaining: -1, unlimited: true };
 }
 
 /* ------------------------------------------------------------------ *
@@ -229,7 +276,37 @@ async function insertAction(
  * Action: chat
  * ------------------------------------------------------------------ */
 
-async function handleChat(sb: AuthedContext['supabase'], userId: string, body: Record<string, unknown>): Promise<Response> {
+/** Writes are best effort for guests: their id may not exist in auth.users, and a
+ * project without the service-role secret cannot satisfy RLS — the reply must still work. */
+async function persist(sb: AuthedContext['supabase'], isGuest: boolean, write: () => Promise<void>): Promise<void> {
+  try {
+    await write();
+  } catch (e) {
+    if (!isGuest) throw e;
+    console.warn('netmax-ai: guest write skipped:', e);
+  }
+}
+
+/** Records today's request count for the admin tables. Never blocks or caps a reply. */
+async function recordUsage(sb: AuthedContext['supabase'], userId: string): Promise<number> {
+  try {
+    const { data, error } = await sb.rpc('increment_ai_usage', { p_user: userId });
+    if (error) return 0;
+    const count = Number(data);
+    // A negative count used to mean "over the daily limit"; the cap is gone, so the
+    // stored value is only ever reported back for the UI.
+    return Number.isFinite(count) && count > 0 ? count : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function handleChat(
+  sb: AuthedContext['supabase'],
+  userId: string,
+  body: Record<string, unknown>,
+  isGuest: boolean
+): Promise<Response> {
   const message = typeof body.message === 'string' ? body.message.trim().slice(0, MAX_MESSAGE_CHARS) : '';
   const imageBase64 = typeof body.imageBase64 === 'string' ? body.imageBase64 : null;
   const imageMimeType = typeof body.imageMimeType === 'string' ? body.imageMimeType : 'image/jpeg';
@@ -243,17 +320,8 @@ async function handleChat(sb: AuthedContext['supabase'], userId: string, body: R
     return err(413, 'PAYLOAD_TOO_LARGE', 'Image bahut badi hai. Chhoti image try karein.');
   }
 
-  // ── 1. Atomic daily-limit check (10/day, server clock) ──
-  const { data: count, error: rpcError } = await sb.rpc('increment_ai_usage', { p_user: userId });
-  if (rpcError) return err(500, 'DB_ERROR', 'Usage tracking temporarily unavailable.');
-  const used = Number(count);
-  if (used < 0) {
-    return err(
-      429,
-      'DAILY_LIMIT_REACHED',
-      'Aap aaj ke 10 AI requests use kar chuke hain. Kal dobara try karein.'
-    );
-  }
+  // ── 1. Usage counters (no cap, no failure path for the user) ──
+  const used = await recordUsage(sb, userId);
 
   // ── 2. Conversation + history ──
   let conversationId: string;
@@ -275,20 +343,26 @@ async function handleChat(sb: AuthedContext['supabase'], userId: string, body: R
       .order('created_at', { ascending: false })
       .limit(HISTORY_MESSAGES);
     history = ((msgs ?? []) as DbMessage[]).reverse();
-  } catch {
-    await sb.rpc('refund_ai_usage', { p_user: userId });
-    return err(500, 'DB_ERROR', 'Conversation save nahi ho paya.');
+  } catch (e) {
+    if (!isGuest) return err(500, 'DB_ERROR', 'Conversation save nahi ho paya.');
+    // A guest keeps working without stored history: answer the question anyway.
+    console.warn('netmax-ai: guest conversation skipped:', e);
+    conversationId = '';
   }
 
   // ── 3. Save the user's message ──
-  await saveMessage(
-    sb,
-    userId,
-    conversationId,
-    'user',
-    message || '(image attached)',
-    imageBase64 ? { mime: imageMimeType, bytes: imageBase64.length } : null
-  );
+  if (conversationId) {
+    await persist(sb, isGuest, () =>
+      saveMessage(
+        sb,
+        userId,
+        conversationId,
+        'user',
+        message || '(image attached)',
+        imageBase64 ? { mime: imageMimeType, bytes: imageBase64.length } : null
+      )
+    );
+  }
 
   // ── 4. Ask OpenRouter ──
   const system = buildSystemPrompt(clientContext);
@@ -318,8 +392,6 @@ async function handleChat(sb: AuthedContext['supabase'], userId: string, body: R
   try {
     raw = await callOpenRouter(modelMessages as never, imageBase64 ? VISION_MODEL : TEXT_MODEL);
   } catch (e) {
-    // AI failed → refund the request so the user doesn't lose quota.
-    await sb.rpc('refund_ai_usage', { p_user: userId });
     const msg = String(e);
     if (/abort/i.test(msg)) {
       return err(504, 'AI_TIMEOUT', 'AI jawab dene me bahut time le raha hai. Thodi der baad try karein.');
@@ -359,11 +431,13 @@ async function handleChat(sb: AuthedContext['supabase'], userId: string, body: R
     }
   }
 
-  await saveMessage(sb, userId, conversationId, 'assistant', reply);
+  if (conversationId) {
+    await persist(sb, isGuest, () => saveMessage(sb, userId, conversationId, 'assistant', reply));
+  }
 
   return json({
     ok: true,
-    conversationId,
+    conversationId: conversationId || null,
     reply,
     pendingAction,
     usage: usageOf(used),
@@ -375,7 +449,12 @@ async function handleChat(sb: AuthedContext['supabase'], userId: string, body: R
  * the daily AI quota; no model call happens here)
  * ------------------------------------------------------------------ */
 
-async function handleSubmit(sb: AuthedContext['supabase'], userId: string, body: Record<string, unknown>): Promise<Response> {
+async function handleSubmit(
+  sb: AuthedContext['supabase'],
+  userId: string,
+  body: Record<string, unknown>,
+  isGuest: boolean
+): Promise<Response> {
   const validated = validateSubmitPayload(body);
   if (!validated.ok) return err(400, 'INVALID_REQUEST', 'Request ka format galat hai.');
 
@@ -395,7 +474,7 @@ async function handleSubmit(sb: AuthedContext['supabase'], userId: string, body:
     const device = (body.device ?? null) as AiClientContext['device'];
     const confirmation = await insertAction(sb, userId, validated.type, validated.payload, device);
     if (conversationId) {
-      await saveMessage(sb, userId, conversationId, 'assistant', confirmation);
+      await persist(sb, isGuest, () => saveMessage(sb, userId, conversationId, 'assistant', confirmation));
     }
     return json({ ok: true, conversationId, message: confirmation });
   } catch {
@@ -408,6 +487,16 @@ async function handleSubmit(sb: AuthedContext['supabase'], userId: string, body:
  * ------------------------------------------------------------------ */
 
 async function handleHistory(sb: AuthedContext['supabase'], userId: string): Promise<Response> {
+  try {
+    return await readHistory(sb, userId);
+  } catch (e) {
+    // History is a nicety: an unreadable table must not look like a broken AI.
+    console.warn('netmax-ai: history unavailable:', e);
+    return json({ ok: true, conversationId: null, messages: [], usage: usageOf(0) });
+  }
+}
+
+async function readHistory(sb: AuthedContext['supabase'], userId: string): Promise<Response> {
   const { data: conv } = await sb
     .from('ai_conversations')
     .select('id')
@@ -451,10 +540,6 @@ Deno.serve(async (req: Request) => {
     return err(405, 'METHOD_NOT_ALLOWED', 'POST only.');
   }
 
-  const authed = await authenticate(req);
-  if (!authed) {
-    return err(401, 'UNAUTHORIZED', 'AI use karne ke liye login karein.');
-  }
   if (!OPENROUTER_KEY) {
     return err(503, 'AI_NOT_CONFIGURED', 'AI abhi configured nahi hai.');
   }
@@ -466,11 +551,17 @@ Deno.serve(async (req: Request) => {
     return err(400, 'INVALID_REQUEST', 'Body JSON nahi hai.');
   }
 
+  // A missing/foreign session is not an error any more — it makes a guest caller.
+  const caller = await resolveCaller(req, body);
   const action = body.action;
   try {
-    if (action === 'chat') return await handleChat(authed.supabase, authed.userId, body);
-    if (action === 'submit') return await handleSubmit(authed.supabase, authed.userId, body);
-    if (action === 'history') return await handleHistory(authed.supabase, authed.userId);
+    if (action === 'chat') {
+      return await handleChat(caller.supabase, caller.userId, body, caller.isGuest);
+    }
+    if (action === 'submit') {
+      return await handleSubmit(caller.supabase, caller.userId, body, caller.isGuest);
+    }
+    if (action === 'history') return await handleHistory(caller.supabase, caller.userId);
     return err(400, 'INVALID_REQUEST', 'Unknown action.');
   } catch (e) {
     console.error('netmax-ai error:', e);

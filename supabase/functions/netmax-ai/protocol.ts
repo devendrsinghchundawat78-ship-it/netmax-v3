@@ -53,7 +53,9 @@ export interface AiClientContext {
  * Limits / validation
  * ------------------------------------------------------------------ */
 
-export const DAILY_LIMIT = 10;
+// The per-day cap was removed: every user (and every guest) has unlimited AI requests.
+// The export stays so older copies of this function keep compiling; nothing enforces it.
+export const DAILY_LIMIT = 0;
 export const MAX_MESSAGE_CHARS = 4000;
 export const MAX_IMAGE_BASE64_BYTES = 4_500_000; // ~4.5 MB base64 (~3.3 MB image)
 
