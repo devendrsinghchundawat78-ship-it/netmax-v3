@@ -4,6 +4,7 @@ android-compileSdk = "37"
 android-compileSdkMinor = "0"
 android-minSdk = "24"
 android-targetSdk = "36"
+backdrop = "2.0.1"
 androidx-activity = "1.12.2"
 androidx-navigation3 = "1.1.1"
 androidx-appcompat = "1.7.1"
@@ -35,6 +36,7 @@ sentry = "8.47.0"
 sentryGradle = "6.14.0"
 
 [libraries]
+backdrop = { module = "io.github.kyant0:backdrop", version.ref = "backdrop" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 junit = { module = "junit:junit", version.ref = "junit" }

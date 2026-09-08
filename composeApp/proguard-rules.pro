@@ -121,3 +121,32 @@
 -keep class com.nuvio.app.features.netmax.NetmaxAiService { *; }
 -keep class com.nuvio.app.features.netmax.AiHistoryMessage { *; }
 -keep class com.nuvio.app.features.netmax.AiHistoryMessage$* { *; }
+
+# ─── Liquid Glass (Backdrop library) hardening ────────────────────────────────
+# The Backdrop library ships no consumer ProGuard rules of its own. Its render
+# pipeline is driven from draw callbacks (DrawModifierNode / GraphicsLayer), the
+# exact pattern R8's inlining has already broken twice in this app (StreamsScreenKt,
+# PlayerScreenKt → verifier-invalid bytecode, fatal crash on first composition).
+-keep class com.kyant.backdrop.** { *; }
+-keep class com.kyant.shapes.** { *; }
+
+# Composables that host the liquid-glass surfaces (nav pill + sliding lens, FAB,
+# poster long-press action menu, continue-watching cards). Same hardening pattern
+# as the screens above: keep the composable class + all its lambda/synthetic
+# classes so R8 cannot inline or merge the draw/click paths.
+-keep class com.nuvio.app.MainTabsDestinationKt { *; }
+-keep class com.nuvio.app.MainTabsDestinationKt$* { *; }
+-keep class com.nuvio.app.core.ui.NavigationBarKt { *; }
+-keep class com.nuvio.app.core.ui.NavigationBarKt$* { *; }
+-keep class com.nuvio.app.core.ui.BackdropLiquidGlassKt { *; }
+-keep class com.nuvio.app.core.ui.BackdropLiquidGlassKt$* { *; }
+-keep class com.nuvio.app.core.ui.PosterZoomActionOverlayKt { *; }
+-keep class com.nuvio.app.core.ui.PosterZoomActionOverlayKt$* { *; }
+-keep class com.nuvio.app.core.ui.LiquidGlassKt { *; }
+-keep class com.nuvio.app.core.ui.LiquidGlassKt$* { *; }
+-keep class com.nuvio.app.MainAppContentKt { *; }
+-keep class com.nuvio.app.MainAppContentKt$* { *; }
+-keep class com.nuvio.app.features.details.MetaDetailsScreenKt { *; }
+-keep class com.nuvio.app.features.details.MetaDetailsScreenKt$* { *; }
+-keep class com.nuvio.app.features.home.components.HomeContinueWatchingSectionKt { *; }
+-keep class com.nuvio.app.features.home.components.HomeContinueWatchingSectionKt$* { *; }

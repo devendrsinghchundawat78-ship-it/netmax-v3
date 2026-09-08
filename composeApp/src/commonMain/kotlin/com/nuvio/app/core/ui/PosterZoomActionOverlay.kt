@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.min
 import coil3.compose.AsyncImage
+import com.kyant.backdrop.Backdrop
 import dev.chrisbanes.haze.HazeInputScale
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -145,6 +146,7 @@ fun NuvioPosterZoomActionOverlay(
     anchor: PosterZoomAnchor?,
     actions: List<PosterZoomOverlayAction>,
     hazeState: HazeState,
+    glassBackdrop: Backdrop? = null,
     onDismissed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -315,11 +317,15 @@ fun NuvioPosterZoomActionOverlay(
                         scaleY = scale
                         transformOrigin = TransformOrigin(0.5f, 0f)
                     }
+                    .backdropLiquidGlass(
+                        backdrop = glassBackdrop,
+                        shape = RoundedCornerShape(NuvioTokens.Space.s20),
+                        fallbackColor = tokens.colors.surfaceElevated,
+                    )
                     .graphicsLayer {
                         shape = RoundedCornerShape(NuvioTokens.Space.s20.toPx())
                         clip = true
-                    }
-                    .background(tokens.colors.surfaceElevated),
+                    },
             ) {
                 frozenActions.forEachIndexed { index, action ->
                     if (index > 0) {

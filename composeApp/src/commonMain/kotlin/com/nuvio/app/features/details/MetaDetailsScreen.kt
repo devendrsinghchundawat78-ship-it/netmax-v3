@@ -89,6 +89,8 @@ import com.nuvio.app.core.ui.PosterZoomOverlayAction
 import com.nuvio.app.core.ui.TrackingListPickerDialog
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.core.ui.rememberHeroStretchState
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import com.nuvio.app.features.details.components.DetailActionButtons
@@ -220,6 +222,7 @@ fun MetaDetailsScreen(
     var selectedEpisodeForActions by remember(type, id) { mutableStateOf<MetaVideo?>(null) }
     var selectedEpisodeZoomAnchor by remember(type, id) { mutableStateOf<PosterZoomAnchor?>(null) }
     val episodeOverlayHazeState = rememberHazeState()
+    val episodeOverlayBackdrop = rememberLayerBackdrop()
     var selectedSeasonForActions by remember(type, id) { mutableStateOf<Int?>(null) }
     val commentsEnabled by remember {
         TraktCommentsSettings.ensureLoaded()
@@ -423,7 +426,9 @@ fun MetaDetailsScreen(
                 .fillMaxSize()
                 .then(
                     if (selectedEpisodeZoomAnchor != null) {
-                        Modifier.hazeSource(state = episodeOverlayHazeState)
+                        Modifier
+                            .hazeSource(state = episodeOverlayHazeState)
+                            .layerBackdrop(episodeOverlayBackdrop)
                     } else {
                         Modifier
                     },
@@ -1759,6 +1764,7 @@ fun MetaDetailsScreen(
                     }
                 },
                 hazeState = episodeOverlayHazeState,
+                glassBackdrop = episodeOverlayBackdrop,
                 onDismissed = {
                     selectedEpisodeForActions = null
                     selectedEpisodeZoomAnchor = null

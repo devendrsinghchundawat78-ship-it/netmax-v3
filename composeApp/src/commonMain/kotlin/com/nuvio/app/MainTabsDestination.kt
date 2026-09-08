@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -32,6 +31,14 @@ import com.nuvio.app.core.ui.PlatformBackHandler
 import com.nuvio.app.core.ui.rememberNuvioNavBarScrollState
 import com.nuvio.app.features.profiles.NuvioProfile
 import com.nuvio.app.features.profiles.ProfileSwitcherTab
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.isRenderEffectSupported
+import com.nuvio.app.core.ui.backdropLiquidGlass
+import com.nuvio.app.features.settings.LiquidGlassSettingsRepository
 import com.nuvio.app.features.settings.NavBarStyle
 import com.nuvio.app.features.settings.ThemeSettingsRepository
 import dev.chrisbanes.haze.hazeSource
@@ -77,6 +84,14 @@ internal fun MainTabsDestination(
         val navBarScrollState = rememberNuvioNavBarScrollState()
         val navBarHazeState = rememberHazeState()
         val navBarStyleSetting by remember { ThemeSettingsRepository.navBarStyle }.collectAsStateWithLifecycle()
+        val tabContentBackdrop = rememberLayerBackdrop()
+        LiquidGlassSettingsRepository.ensureLoaded()
+        val liquidGlassSettings by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
+        val tabGlassLayerActive = !useNativeBottomTabs &&
+            navBarStyleSetting != NavBarStyle.CLASSIC &&
+            liquidGlassNativeTabBarEnabled &&
+            liquidGlassSettings.enabled &&
+            isRenderEffectSupported()
         val swipeTabs = remember { listOf(AppScreenTab.Home, AppScreenTab.Search, AppScreenTab.Library, AppScreenTab.Settings) }
         fun switchTabBySwipe(delta: Int) {
             val index = swipeTabs.indexOf(selectedTab)
@@ -139,18 +154,33 @@ internal fun MainTabsDestination(
                         modifier = Modifier
                             .fillMaxSize()
                             .then(if (navBarStyleSetting != NavBarStyle.CLASSIC) Modifier.hazeSource(state = navBarHazeState) else Modifier)
+                            .then(if (tabGlassLayerActive) Modifier.layerBackdrop(tabContentBackdrop) else Modifier)
                             .then(if (navBarStyleSetting == NavBarStyle.ADAPTIVE) Modifier.nestedScroll(navBarScrollState.nestedScrollConnection) else Modifier)
                             .padding(innerPadding),
                     )
                 }
 
                 if (selectedTab == AppScreenTab.Home && !useNativeNavigation) {
-                    FloatingActionButton(
-                        onClick = onOpenNetmaxAi,
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = if (isTabletLayout) 18.dp else 94.dp),
-                        containerColor = MaterialTheme.colorScheme.primary,
+                    val fabGlassActive = tabGlassLayerActive
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 18.dp, bottom = if (isTabletLayout) 18.dp else 94.dp)
+                            .size(56.dp)
+                            .backdropLiquidGlass(
+                                backdrop = tabContentBackdrop.takeIf { fabGlassActive },
+                                shape = CircleShape,
+                                fallbackColor = MaterialTheme.colorScheme.primary,
+                                contentDimAlpha = 0.12f,
+                            )
+                            .clickable(onClick = onOpenNetmaxAi),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Rounded.AutoAwesome, contentDescription = "NetMax AI")
+                        Icon(
+                            Icons.Rounded.AutoAwesome,
+                            contentDescription = "NetMax AI",
+                            tint = if (fabGlassActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
+                        )
                     }
                 }
 
@@ -175,6 +205,7 @@ internal fun MainTabsDestination(
                         modifier = Modifier.align(Alignment.BottomCenter),
                         scrollState = navBarScrollState,
                         hazeState = navBarHazeState,
+                        glassBackdrop = tabContentBackdrop.takeIf { tabGlassLayerActive },
                         onSwipeLeft = { switchTabBySwipe(1) },
                         onSwipeRight = { switchTabBySwipe(-1) },
                     ) {

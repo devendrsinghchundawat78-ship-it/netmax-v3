@@ -2,6 +2,7 @@ package com.nuvio.app.core.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -22,26 +24,35 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.kyant.backdrop.Backdrop
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -120,11 +131,14 @@ fun NuvioNavigationBar(
     modifier: Modifier = Modifier,
     scrollState: NuvioNavBarScrollState? = null,
     hazeState: HazeState? = null,
+    glassBackdrop: Backdrop? = null,
     onSwipeLeft: (() -> Unit)? = null,
     onSwipeRight: (() -> Unit)? = null,
     content: @Composable NuvioNavigationBarScope.() -> Unit,
 ) {
     val liquidGlassEnabled by ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.collectAsStateWithLifecycle()
+    val useBackdropGlass = glassBackdrop != null && liquidGlassEnabled
+    val selectedTabBounds = remember { mutableStateOf<Rect?>(null) }
 
     val labelFraction by animateFloatAsState(
         targetValue = scrollState?.labelVisibility ?: 1f,
@@ -165,17 +179,35 @@ fun NuvioNavigationBar(
         contentAlignment = Alignment.BottomCenter,
     ) {
         val glassShape = RoundedCornerShape(NuvioTokens.Radius.full)
-        val pillModifier = Modifier
-            .padding(horizontal = horizontalPadding)
-            .fillMaxWidth()
-            .liquidGlass(
-                shape = glassShape,
-                hazeState = hazeState,
-                isEnabled = liquidGlassEnabled,
-                borderWidth = 1.2.dp,
-            )
+        val pillModifier = if (useBackdropGlass) {
+            Modifier
+                .padding(horizontal = horizontalPadding)
+                .fillMaxWidth()
+                .backdropLiquidGlass(
+                    backdrop = glassBackdrop,
+                    shape = glassShape,
+                    fallbackColor = MaterialTheme.nuvio.colors.surface.copy(alpha = 0.94f),
+                    contentDimAlpha = 0.20f,
+                )
+        } else {
+            Modifier
+                .padding(horizontal = horizontalPadding)
+                .fillMaxWidth()
+                .liquidGlass(
+                    shape = glassShape,
+                    hazeState = hazeState,
+                    isEnabled = liquidGlassEnabled,
+                    borderWidth = 1.2.dp,
+                )
+        }
 
         Box(modifier = pillModifier) {
+            if (useBackdropGlass) {
+                SlidingGlassTabIndicator(
+                    backdrop = glassBackdrop,
+                    selectedBounds = selectedTabBounds.value,
+                )
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -189,6 +221,8 @@ fun NuvioNavigationBar(
                 NuvioNavigationBarScopeImpl(
                     rowScope = this,
                     labelFraction = labelFraction,
+                    glassIndicatorActive = useBackdropGlass,
+                    selectedBoundsState = selectedTabBounds,
                 ).content()
             }
         }
@@ -226,10 +260,79 @@ interface NuvioNavigationBarScope {
     )
 }
 
+/**
+ * Liquid-glass lens that slides between the navigation tabs. The selected tab
+ * reports its bounds; this indicator springs to that position, refracting the
+ * content behind the bar (Backdrop lens effect) as it travels.
+ */
+@Composable
+private fun SlidingGlassTabIndicator(
+    backdrop: Backdrop?,
+    selectedBounds: Rect?,
+) {
+    if (backdrop == null) return
+    val tokens = MaterialTheme.nuvio
+    var hostOrigin by remember { mutableStateOf(Offset.Zero) }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { coordinates -> hostOrigin = coordinates.positionInRoot() },
+    ) {
+        val bounds = selectedBounds
+        if (bounds != null && bounds.width > 0f && bounds.height > 0f) {
+            val density = LocalDensity.current
+            val indicatorWidth = with(density) { bounds.width.toDp() }
+            val indicatorHeight = with(density) { bounds.height.toDp() }
+            val targetX = bounds.left - hostOrigin.x
+            val targetY = bounds.top - hostOrigin.y
+            val slideSpec = spring<Float>(dampingRatio = 0.8f, stiffness = 480f)
+            val animatedX by animateFloatAsState(
+                targetValue = targetX,
+                animationSpec = slideSpec,
+                label = "nav_glass_slide_x",
+            )
+            val animatedY by animateFloatAsState(
+                targetValue = targetY,
+                animationSpec = slideSpec,
+                label = "nav_glass_slide_y",
+            )
+            Box(
+                modifier = Modifier
+                    .size(indicatorWidth, indicatorHeight)
+                    .backdropLiquidGlass(
+                        backdrop = backdrop,
+                        shape = RoundedCornerShape(NuvioTokens.Radius.full),
+                        fallbackColor = tokens.colors.accent.copy(alpha = NuvioTokens.Opacity.selected),
+                        contentDimAlpha = 0.06f,
+                        tintAlphaOverride = 0.08f,
+                        layerBlock = {
+                            translationX = animatedX
+                            translationY = animatedY
+                        },
+                    ),
+            )
+        }
+    }
+}
+
 private class NuvioNavigationBarScopeImpl(
     private val rowScope: androidx.compose.foundation.layout.RowScope,
     private val labelFraction: Float,
+    private val glassIndicatorActive: Boolean,
+    private val selectedBoundsState: MutableState<Rect?>,
 ) : NuvioNavigationBarScope {
+
+    /**
+     * Cell background: when the sliding glass lens is active it carries the
+     * selection highlight, so the per-item accent pill is skipped and the
+     * selected item reports its bounds so the lens can slide to it.
+     */
+    private fun Modifier.tabCell(selected: Boolean, selectedBgColor: Color): Modifier = this
+        .clip(RoundedCornerShape(NuvioTokens.Radius.full))
+        .then(if (glassIndicatorActive) Modifier else Modifier.background(selectedBgColor))
+        .onGloballyPositioned { coordinates ->
+            if (selected) selectedBoundsState.value = coordinates.boundsInRoot()
+        }
 
     @Composable
     override fun NavItem(
@@ -260,8 +363,7 @@ private class NuvioNavigationBarScopeImpl(
             Column(
                 modifier = modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(NuvioTokens.Radius.full))
-                    .background(selectedBgColor)
+                    .tabCell(selected = selected, selectedBgColor = selectedBgColor)
                     .selectable(
                         selected = selected,
                         enabled = true,
@@ -312,8 +414,7 @@ private class NuvioNavigationBarScopeImpl(
             Column(
                 modifier = modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(NuvioTokens.Radius.full))
-                    .background(selectedBgColor)
+                    .tabCell(selected = selected, selectedBgColor = selectedBgColor)
                     .selectable(
                         selected = selected,
                         enabled = true,
@@ -362,8 +463,7 @@ private class NuvioNavigationBarScopeImpl(
             Column(
                 modifier = modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(NuvioTokens.Radius.full))
-                    .background(selectedBgColor)
+                    .tabCell(selected = selected, selectedBgColor = selectedBgColor)
                     .selectable(
                         selected = selected,
                         enabled = true,
