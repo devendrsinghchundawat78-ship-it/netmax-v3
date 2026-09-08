@@ -122,7 +122,9 @@ object DownloadsRepository {
             ?.takeIf { it.isNotBlank() }
             ?: return DownloadEnqueueResult.MissingUrl
 
-        if (!sourceUrl.isSupportedDownloadFileUrl()) {
+        // Same gate as the download picker: extension-less direct URLs are accepted
+        // (the player streams them fine), only hidden manifests are rejected.
+        if (!stream.isDownloadableFileSource()) {
             return DownloadEnqueueResult.UnsupportedFormat
         }
 

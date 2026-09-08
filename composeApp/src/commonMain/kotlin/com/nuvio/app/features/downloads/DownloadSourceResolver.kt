@@ -139,7 +139,40 @@ internal val StreamItem.downloadQualityLabel: String
     get() = StreamQualityHints.labelOf(downloadQualityScore)
 
 internal fun StreamItem.isDownloadableFileSource(): Boolean =
-    downloadableFileUrl != null
+    downloadableFileUrl != null && !filenameHintsNonDownloadableManifest()
+
+/**
+ * Some providers serve real video files through URLs that carry no file extension
+ * (`…/file/abc123`, `…/dl?id=xyz`). The player happily plays those URLs because it
+ * sniffs content instead of checking extensions, but the download gate used to
+ * reject them with "unsupported format" even though the source was an mkv/mp4.
+ *
+ * The filename hints ([StreamItem.behaviorHints] filename / client resolve filename)
+ * are therefore only consulted to reject sources that are secretly manifests the
+ * plain-GET downloader cannot turn into a playable local file (.mpd/.torrent, or an
+ * .m3u8 whose URL does not advertise it).
+ */
+internal fun StreamItem.filenameHintsNonDownloadableManifest(): Boolean {
+    val extension = listOfNotNull(behaviorHints.filename, clientResolve?.filename)
+        .firstOrNull { it.isNotBlank() }
+        ?.lowercase()
+        ?.substringBefore('?')
+        ?.substringBefore('#')
+        ?.substringAfterLast('.', "")
+    return extension == "mpd" || extension == "torrent" || extension == "m3u8"
+}
+
+/** Direct-file extensions the downloader recognizes on sight. */
+private val DownloadFileExtensions = setOf(
+    "mp4", "mkv", "webm", "m4v", "mov", "avi", "ts", "mpeg", "mpg",
+    "m2ts", "mts", "flv", "3gp", "wmv", "ogv",
+)
+
+/** Extensions that are definitely not a downloadable video file. */
+private val NonDownloadableFileExtensions = setOf(
+    "html", "htm", "srt", "vtt", "ass", "ssa", "zip", "rar", "7z",
+    "nfo", "jpg", "jpeg", "png", "gif", "webp", "txt",
+)
 
 internal fun String.isSupportedDownloadFileUrl(): Boolean {
     val normalized = trim()
@@ -154,7 +187,14 @@ internal fun String.isSupportedDownloadFileUrl(): Boolean {
 
     val path = lower.substringBefore('?').substringBefore('#')
     val extension = path.substringAfterLast('.', "")
-    return extension in setOf("mp4", "mkv", "webm", "m4v", "mov", "avi", "ts", "mpeg", "mpg")
+    if (extension in DownloadFileExtensions) return true
+    if (extension in NonDownloadableFileExtensions) return false
+    // Anything else — an extension-less URL (`…/file/abc123`), an extension hidden
+    // in a query parameter (`…/dl?id=xyz&f=movie.mkv`) or an unknown endpoint —
+    // is the very same URL the player streams from, so a plain GET downloads the
+    // same bytes. Allow it instead of falsely reporting "unsupported format";
+    // the manifest forms that genuinely cannot be downloaded are rejected above.
+    return true
 }
 
 /** True for `http(s)` URLs whose path points at an HLS playlist (`.m3u8`). */
