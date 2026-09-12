@@ -1811,6 +1811,7 @@
     <string name="library_sort_title_desc">Заглавие Я-А</string>
     <string name="library_sort_provider_order">Ред на тракера</string>
     <string name="library_source_cloud">Облак</string>
+    <string name="library_source_downloads">Изтегляния</string>
     <string name="library_source_saved">Запазени</string>
     <string name="library_title">Библиотека</string>
     <string name="library_trakt_empty_message">Свържете Trakt и запазвайте заглавия в своя списък за гледане или лични списъци.</string>

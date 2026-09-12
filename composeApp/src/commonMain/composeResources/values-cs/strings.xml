@@ -1539,6 +1539,7 @@
     <string name="library_load_failed">Knihovnu se nepodařilo načíst</string>
     <string name="library_other">Ostatní</string>
     <string name="library_source_cloud">Cloud</string>
+    <string name="library_source_downloads">Stažené položky</string>
     <string name="library_source_saved">Uložené</string>
     <string name="library_title">Knihovna</string>
     <string name="library_trakt_empty_message">Připojte se k Trakt a uložte tituly do seznamu sledovaných nebo osobních seznamů.</string>

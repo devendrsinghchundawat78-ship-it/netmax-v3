@@ -40,6 +40,7 @@ import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.CloudLibraryFile
 import com.nuvio.app.features.cloud.CloudLibraryItem
+import com.nuvio.app.features.downloads.DownloadItem
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.HomeScreen
 import com.nuvio.app.features.home.MetaPreview
@@ -114,6 +115,8 @@ internal data class AppTabActions(
     val onLibrarySectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)? = null,
     val onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
     val onConnectCloudClick: (() -> Unit)? = null,
+    val onOpenDownload: ((DownloadItem) -> Unit)? = null,
+    val onOpenDownloadShow: ((showId: String, title: String) -> Unit)? = null,
     val onContinueWatchingClick: ((ContinueWatchingItem) -> Unit)? = null,
     val onContinueWatchingLongPress: ((ContinueWatchingItem) -> Unit)? = null,
     val onSwitchProfile: (() -> Unit)? = null,
@@ -186,6 +189,8 @@ internal fun AppTabHost(
                         onSectionViewAllClick = actions.onLibrarySectionViewAllClick,
                         onCloudFilePlay = actions.onCloudFilePlay,
                         onConnectCloudClick = actions.onConnectCloudClick,
+                        onOpenDownload = actions.onOpenDownload,
+                        onOpenDownloadShow = actions.onOpenDownloadShow,
                         disintegrationRequest = state.libraryDisintegrationRequest,
                     )
                 }

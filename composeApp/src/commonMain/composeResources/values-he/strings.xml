@@ -660,6 +660,7 @@
     <string name="downloads_error_finalize_failed">סיום קובץ ההורדה נכשל</string>
     <string name="downloads_error_http_failed">הבקשה נכשלה עם HTTP %1$d</string>
     <string name="library_source_cloud">ענן</string>
+    <string name="library_source_downloads">הורדות</string>
     <string name="library_source_saved">נשמר</string>
     <string name="library_title">ספרייה</string>
     <string name="cloud_library_connect_action">חבר חשבון</string>

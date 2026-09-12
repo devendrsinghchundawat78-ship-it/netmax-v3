@@ -1653,6 +1653,7 @@
     <string name="library_local_tab_title">NetMax Βιβλιοθήκη</string>
     <string name="library_remove_from_list_message">Κατάργηση %1$s από %2$s;</string>
     <string name="library_source_cloud">Cloud</string>
+    <string name="library_source_downloads">Λήψεις</string>
     <string name="library_source_saved">Αποθηκευμένα</string>
     <string name="network_connection_issue">Πρόβλημα σύνδεσης</string>
     <string name="network_empty_response_body">Κενό σώμα απόκρισης</string>

@@ -1714,6 +1714,7 @@
     <string name="library_sort_title_desc">Başlık Z–A</string>
     <string name="library_sort_provider_order">Takip servisi sırası</string>
     <string name="library_source_cloud">Bulut</string>
+    <string name="library_source_downloads">İndirilenler</string>
     <string name="library_source_saved">Kaydedildi</string>
     <string name="library_title">Kitaplık</string>
     <string name="library_trakt_empty_message">Trakt'ı bağla ve içerikleri izleme listene ya da kişisel listelerine kaydet.</string>

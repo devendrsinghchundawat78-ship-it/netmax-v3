@@ -1582,6 +1582,7 @@
     <string name="downloads_error_partial_not_open">A töredékes letöltési fájl nincs megnyitva</string>
     <string name="downloads_error_write_partial_failed">Nem sikerült írni a töredékes letöltési fájlba</string>
     <string name="library_source_cloud">Felhő</string>
+    <string name="library_source_downloads">Letöltések</string>
     <string name="library_source_saved">Mentett</string>
     <string name="cloud_library_connect_action">Fiók összekapcsolása</string>
     <string name="cloud_library_connect_message">Kapcsolj össze egy fiókot a Csatlakoztatott szolgáltatások beállításainál, hogy böngészhesd a lejátszható fájlokat a felhőalapú könyvtáradból.</string>

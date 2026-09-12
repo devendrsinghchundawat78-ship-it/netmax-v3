@@ -1859,6 +1859,7 @@
     <string name="library_sort_title_desc">Title Z–A</string>
     <string name="library_sort_provider_order">Tracker order</string>
     <string name="library_source_cloud">Cloud</string>
+    <string name="library_source_downloads">Downloads</string>
     <string name="library_source_saved">Saved</string>
     <string name="library_title">Library</string>
     <string name="library_trakt_empty_message">Connect Trakt and save titles to your watchlist or personal lists.</string>

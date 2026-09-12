@@ -1714,6 +1714,7 @@
     <string name="library_sort_title_desc">Titel Z–A</string>
     <string name="library_sort_provider_order">Volgorde van tracker</string>
     <string name="library_source_cloud">Cloud</string>
+    <string name="library_source_downloads">Downloads</string>
     <string name="library_source_saved">Opgeslagen</string>
     <string name="library_title">Bibliotheek</string>
     <string name="library_trakt_empty_message">Verbind Trakt en sla titels op in je kijklijst of persoonlijke lijsten.</string>

@@ -1564,6 +1564,7 @@
     <string name="library_load_failed">Nu s-a putut încărca biblioteca</string>
     <string name="library_other">Altele</string>
     <string name="library_source_cloud">Cloud</string>
+    <string name="library_source_downloads">Descărcări</string>
     <string name="library_source_saved">Salvate</string>
     <string name="library_title">Bibliotecă</string>
     <string name="library_trakt_empty_message">Conectează Trakt și salvează titluri în lista de urmărire sau în listele personale.</string>

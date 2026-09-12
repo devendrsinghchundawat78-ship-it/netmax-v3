@@ -1287,6 +1287,7 @@
     <string name="library_remove_message">Usunąć %1$s z biblioteki?</string>
     <string name="library_remove_title">Usunąć z biblioteki?</string>
     <string name="library_source_cloud">Chmura</string>
+    <string name="library_source_downloads">Pobrane</string>
     <string name="library_source_saved">Zapisane</string>
     <string name="media_movie">Film</string>
     <string name="notifications_channel_episode_releases_description">Alerty o premierach nowych odcinków zapisanych seriali.</string>

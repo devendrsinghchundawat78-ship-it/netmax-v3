@@ -1456,6 +1456,7 @@
   <string name="library_remove_from_list_message">Rimuovere %1$s da %2$s?</string>
   <string name="collections_import_error_trakt_list_id">Alla sorgente %1$d nella cartella '%2$s' manca l'ID della lista Trakt.</string>
   <string name="library_source_cloud">Cloud</string>
+    <string name="library_source_downloads">Download</string>
   <string name="library_source_saved">Salvati</string>
   <string name="cloud_library_connect_action">Connetti account</string>
   <string name="cloud_library_connect_message">Connetti un account nelle impostazioni dei Servizi connessi per sfogliare i file riproducibili dalla tua libreria cloud.</string>

@@ -1510,6 +1510,7 @@
     <string name="library_load_failed">Nepodarilo sa načítať knižnicu</string>
     <string name="library_other">Ostatné</string>
     <string name="library_source_cloud">Cloud</string>
+    <string name="library_source_downloads">Stiahnuté</string>
     <string name="library_source_saved">Uložené</string>
     <string name="library_title">Knižnica</string>
     <string name="library_trakt_empty_message">Pripojte Trakt a uložte tituly do zoznamu sledovania alebo osobných zoznamov.</string>

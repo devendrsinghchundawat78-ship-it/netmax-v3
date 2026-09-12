@@ -1497,6 +1497,7 @@
     <string name="library_load_failed">Não foi possível carregar a biblioteca</string>
     <string name="library_other">Outro</string>
     <string name="library_source_cloud">Nuven</string>
+    <string name="library_source_downloads">Transferências</string>
     <string name="library_source_saved">Guardado</string>
     <string name="library_title">Biblioteca</string>
     <string name="library_trakt_empty_message">Liga o Trakt e guarda títulos na tua lista de conteúdos ou nas tuas listas pessoais.</string>

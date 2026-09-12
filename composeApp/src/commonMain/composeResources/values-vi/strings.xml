@@ -1543,6 +1543,7 @@
     <string name="library_load_failed">Không thể tải thư viện</string>
     <string name="library_other">Khác</string>
     <string name="library_source_cloud">Đám mây</string>
+    <string name="library_source_downloads">Tải xuống</string>
     <string name="library_source_saved">Đã lưu</string>
     <string name="library_title">Thư viện</string>
     <string name="library_trakt_empty_message">Kết nối Trakt và lưu nội dung vào Danh sách theo dõi hoặc danh sách cá nhân</string>

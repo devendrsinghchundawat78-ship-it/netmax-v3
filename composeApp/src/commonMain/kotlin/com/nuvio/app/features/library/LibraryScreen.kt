@@ -73,6 +73,7 @@ import com.nuvio.app.core.ui.NuvioDropdownOption
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioScreenHeader
+import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.NuvioViewAllPillSize
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.ScopedDisintegrationTracker
@@ -83,6 +84,11 @@ import com.nuvio.app.features.cloud.CloudLibraryItemType
 import com.nuvio.app.features.cloud.CloudLibraryRepository
 import com.nuvio.app.features.cloud.CloudLibraryUiState
 import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.downloads.DownloadItem
+import com.nuvio.app.features.downloads.DownloadsRepository
+import com.nuvio.app.features.downloads.downloadsRootContent
+import com.nuvio.app.features.downloads.downloadsShowContent
+import com.nuvio.app.features.downloads.sortedForSeriesDownloads
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.components.HomePosterCard
 import com.nuvio.app.features.home.components.HomeSkeletonRow
@@ -106,6 +112,8 @@ fun LibraryScreen(
     onSectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)? = null,
     onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
     onConnectCloudClick: (() -> Unit)? = null,
+    onOpenDownload: ((DownloadItem) -> Unit)? = null,
+    onOpenDownloadShow: ((showId: String, title: String) -> Unit)? = null,
     disintegrationRequest: DisintegrationRequest<String>? = null,
 ) {
     val uiState by remember {
@@ -113,6 +121,10 @@ fun LibraryScreen(
         LibraryRepository.uiState
     }.collectAsStateWithLifecycle()
     val cloudUiState by CloudLibraryRepository.uiState.collectAsStateWithLifecycle()
+    val downloadsUiState by remember {
+        DownloadsRepository.ensureLoaded()
+        DownloadsRepository.uiState
+    }.collectAsStateWithLifecycle()
     val cloudSettings by remember {
         DebridSettingsRepository.ensureLoaded()
         DebridSettingsRepository.uiState
@@ -139,6 +151,8 @@ fun LibraryScreen(
         selectedTypeName?.let { runCatching { CloudLibraryItemType.valueOf(it) }.getOrNull() }
     }
     var selectedCloudItemKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedDownloadShowId by rememberSaveable { mutableStateOf<String?>(null) }
+    var downloadPendingDeletionId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedLibrarySectionKey by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedLibraryType by rememberSaveable { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
@@ -217,9 +231,27 @@ fun LibraryScreen(
         }
     }
 
+    LaunchedEffect(sourceMode) {
+        if (sourceMode == LibraryViewMode.Downloads) {
+            DownloadsRepository.ensureLoaded()
+            selectedDownloadShowId = null
+        }
+    }
+
+    val completedDownloadEpisodes = remember(downloadsUiState.items) {
+        downloadsUiState.completedItems
+            .filter { it.isEpisode }
+            .sortedForSeriesDownloads()
+    }
+    val selectedDownloadShowTitle = remember(selectedDownloadShowId, completedDownloadEpisodes) {
+        selectedDownloadShowId?.let { showId ->
+            completedDownloadEpisodes.firstOrNull { it.parentMetaId == showId }?.title
+        }
+    }
+
     val disintegration = remember { LibraryDisintegrationHolder() }
     val librarySectionsDisplay = if (
-        sourceMode != LibraryViewMode.Cloud &&
+        sourceMode == LibraryViewMode.Saved &&
         displaySettings.layoutMode == LibraryLayoutMode.HORIZONTAL &&
         uiState.isLoaded &&
         sortedSections.isNotEmpty()
@@ -255,14 +287,29 @@ fun LibraryScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         NuvioScreenHeader(
-                            title = if (sourceMode == LibraryViewMode.Cloud) {
-                                stringResource(Res.string.library_title)
-                            } else {
-                                when (uiState.sourceMode) {
-                                    LibrarySourceMode.LOCAL -> stringResource(Res.string.library_title)
-                                    LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_title)
-                                    LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_title)
+                            title = when {
+                                sourceMode == LibraryViewMode.Downloads && selectedDownloadShowId != null -> {
+                                    selectedDownloadShowTitle
+                                        ?: stringResource(Res.string.downloads_show_downloads)
                                 }
+                                sourceMode == LibraryViewMode.Cloud || sourceMode == LibraryViewMode.Downloads -> {
+                                    stringResource(Res.string.library_title)
+                                }
+                                else -> {
+                                    when (uiState.sourceMode) {
+                                        LibrarySourceMode.LOCAL -> stringResource(Res.string.library_title)
+                                        LibrarySourceMode.TRAKT -> stringResource(Res.string.library_trakt_title)
+                                        LibrarySourceMode.SIMKL -> stringResource(Res.string.library_simkl_title)
+                                    }
+                                }
+                            },
+                            onBack = if (
+                                sourceMode == LibraryViewMode.Downloads &&
+                                selectedDownloadShowId != null
+                            ) {
+                                { selectedDownloadShowId = null }
+                            } else {
+                                null
                             },
                             modifier = Modifier.padding(horizontal = 16.dp),
                             actions = {
@@ -344,6 +391,26 @@ fun LibraryScreen(
                     onRefresh = { CloudLibraryRepository.refresh() },
                     onConnectCloudClick = onConnectCloudClick,
                 )
+            } else if (sourceMode == LibraryViewMode.Downloads) {
+                val selectedShowId = selectedDownloadShowId
+                if (selectedShowId == null) {
+                    downloadsRootContent(
+                        uiState = downloadsUiState,
+                        onOpenDownload = { item -> onOpenDownload?.invoke(item) },
+                        onOpenShow = { showId, title ->
+                            onOpenDownloadShow?.invoke(showId, title)
+                                ?: run { selectedDownloadShowId = showId }
+                        },
+                        onDeleteDownload = { downloadPendingDeletionId = it },
+                    )
+                } else {
+                    downloadsShowContent(
+                        showId = selectedShowId,
+                        episodes = completedDownloadEpisodes,
+                        onOpenDownload = { item -> onOpenDownload?.invoke(item) },
+                        onDeleteDownload = { downloadPendingDeletionId = it },
+                    )
+                }
             } else {
                 when {
                     !uiState.isLoaded || (uiState.isLoading && uiState.sections.isEmpty()) -> {
@@ -443,6 +510,22 @@ fun LibraryScreen(
                     }
                 }
             }
+        }
+
+        val pendingDownloadDeletionId = downloadPendingDeletionId
+        if (pendingDownloadDeletionId != null) {
+            NuvioStatusModal(
+                title = stringResource(Res.string.action_delete_confirm_title),
+                message = stringResource(Res.string.action_delete_confirm_message),
+                isVisible = true,
+                confirmText = stringResource(Res.string.action_yes),
+                dismissText = stringResource(Res.string.action_no),
+                onConfirm = {
+                    DownloadsRepository.cancelDownload(pendingDownloadDeletionId)
+                    downloadPendingDeletionId = null
+                },
+                onDismiss = { downloadPendingDeletionId = null },
+            )
         }
     }
 }
@@ -665,6 +748,11 @@ private fun LibrarySourceSwitch(
             label = stringResource(Res.string.library_source_cloud),
             selected = selectedMode == LibraryViewMode.Cloud,
             onClick = { onModeSelected(LibraryViewMode.Cloud) },
+        )
+        LibraryChip(
+            label = stringResource(Res.string.library_source_downloads),
+            selected = selectedMode == LibraryViewMode.Downloads,
+            onClick = { onModeSelected(LibraryViewMode.Downloads) },
         )
     }
 }
@@ -1186,6 +1274,7 @@ private fun CloudSkeletonBlock(
 private enum class LibraryViewMode {
     Saved,
     Cloud,
+    Downloads,
 }
 
 private fun LazyListScope.librarySections(

@@ -1726,6 +1726,7 @@
     <string name="library_sort_title_desc">العنوان ي–أ</string>
     <string name="library_sort_provider_order">ترتيب خدمة التتبع</string>
     <string name="library_source_cloud">سحابي</string>
+    <string name="library_source_downloads">التنزيلات</string>
     <string name="library_source_saved">محفوظ</string>
     <string name="library_title">المكتبة</string>
     <string name="library_trakt_empty_message">اربط Trakt واحفظ العناوين في قائمة المشاهدة أو قوائمك الشخصية.</string>

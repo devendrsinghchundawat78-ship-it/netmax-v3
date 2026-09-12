@@ -1535,6 +1535,7 @@
     <string name="library_load_failed">ライブラリを読み込めませんでした</string>
     <string name="library_other">その他</string>
     <string name="library_source_cloud">クラウド</string>
+    <string name="library_source_downloads">ダウンロード</string>
     <string name="library_source_saved">保存済み</string>
     <string name="library_title">ライブラリ</string>
     <string name="library_trakt_empty_message">Traktに連携してウォッチリストや個人リストにタイトルを保存してください。</string>

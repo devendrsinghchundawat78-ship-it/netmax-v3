@@ -1338,6 +1338,14 @@ internal fun MainAppContent(
                                         activateTab(AppScreenTab.Settings)
                                     }
                                 },
+                                onOpenDownload = ::openDownloadedItem,
+                                onOpenDownloadShow = if (useNativeNavigation && !isTabletLayout) {
+                                    { showId, title ->
+                                        navController.navigate(DownloadShowRoute(showId, title))
+                                    }
+                                } else {
+                                    null
+                                },
                                 onContinueWatchingClick = onContinueWatchingClick,
                                 onContinueWatchingLongPress = onContinueWatchingLongPress,
                                 onSwitchProfile = onSwitchProfile,

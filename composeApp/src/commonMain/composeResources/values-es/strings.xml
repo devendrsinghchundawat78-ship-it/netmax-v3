@@ -1539,6 +1539,7 @@
     <string name="library_load_failed">No se pudo cargar la biblioteca</string>
     <string name="library_other">Otro</string>
     <string name="library_source_cloud">Nube</string>
+    <string name="library_source_downloads">Descargas</string>
     <string name="library_source_saved">Guardado</string>
     <string name="library_title">Biblioteca</string>
     <string name="library_trakt_empty_message">Conecta Trakt y guarda títulos en tu lista de seguimiento o listas personales.</string>

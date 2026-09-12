@@ -1374,6 +1374,7 @@
     <string name="library_load_failed">Tidak dapat memuat pustaka</string>
     <string name="library_other">Lainnya</string>
     <string name="library_source_cloud">Cloud</string>
+    <string name="library_source_downloads">Unduhan</string>
     <string name="library_source_saved">Tersimpan</string>
     <string name="library_title">Pustaka</string>
     <string name="library_trakt_empty_message">Hubungkan Trakt dan simpan judul ke daftar tonton atau daftar pribadi Anda.</string>
