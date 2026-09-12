@@ -112,15 +112,16 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
-# NetMax AI screen: same R8 hardening already applied to StreamsScreenKt/PlayerScreenKt.
+# NetMax AI: same R8 hardening already applied to StreamsScreenKt/PlayerScreenKt.
 # The whole chat is one large composable with nested lambdas and a keyed LazyColumn; R8
 # inlining/merging could produce verifier-invalid bytecode, which fatal-crashes the screen
 # the moment it is opened from the Home FAB or Settings.
--keep class com.nuvio.app.features.netmax.NetmaxAiScreenKt { *; }
--keep class com.nuvio.app.features.netmax.NetmaxAiScreenKt$* { *; }
--keep class com.nuvio.app.features.netmax.NetmaxAiService { *; }
--keep class com.nuvio.app.features.netmax.AiHistoryMessage { *; }
--keep class com.nuvio.app.features.netmax.AiHistoryMessage$* { *; }
+# The whole package is kept (not just the screen): the first thing the screen does is
+# history() -> NetmaxGuestAccess.ensureSession()/guestId() (kotlin.uuid.Uuid + Mutex +
+# Supabase auth session) and NetmaxAiServiceKt's top-level parse helpers — these run
+# inside the first LaunchedEffect, so broken bytecode there crashes on open too.
+-keep class com.nuvio.app.features.netmax.** { *; }
+-keep class kotlin.uuid.** { *; }
 
 # ─── Liquid Glass (Backdrop library) hardening ────────────────────────────────
 # The Backdrop library ships no consumer ProGuard rules of its own. Its render
