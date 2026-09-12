@@ -39,6 +39,7 @@ import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.LiquidGlassDefaults
 import com.nuvio.app.features.settings.LiquidGlassSettingsRepository
 import com.nuvio.app.features.settings.ThemeSettingsRepository
+import com.nuvio.app.core.ui.adaptiveContentColor
 import com.nuvio.app.core.ui.liquidGlass
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -520,7 +521,7 @@ private fun SideControlButton(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = glassTextColor.textColor,
+            tint = glassTextColor.adaptiveContentColor(),
             modifier = Modifier.size(metrics.sideIconSize),
         )
     }
@@ -554,7 +555,7 @@ private fun PlayPauseControlButton(
     ) {
         if (isBuffering) {
             NuvioLoadingIndicator(
-                color = glassTextColor.textColor,
+                color = glassTextColor.adaptiveContentColor(),
                 modifier = Modifier.size(metrics.playIconSize),
             )
         } else {
@@ -565,7 +566,7 @@ private fun PlayPauseControlButton(
                 } else {
                     stringResource(Res.string.detail_btn_play)
                 },
-                tint = glassTextColor.textColor,
+                tint = glassTextColor.adaptiveContentColor(),
                 modifier = Modifier.size(metrics.playIconSize),
             )
         }
@@ -856,21 +857,21 @@ private fun PlayerActionPillButton(
             painter != null -> Icon(
                 painter = painter,
                 contentDescription = label,
-                tint = glassTextColor.textColor,
+                tint = glassTextColor.adaptiveContentColor(),
                 modifier = Modifier.size(18.dp),
             )
 
             icon != null -> Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = glassTextColor.textColor,
+                tint = glassTextColor.adaptiveContentColor(),
                 modifier = Modifier.size(18.dp),
             )
         }
         Text(
             text = label,
             style = MaterialTheme.nuvioTypeScale.labelSm,
-            color = glassTextColor.textColor,
+            color = glassTextColor.adaptiveContentColor(),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             softWrap = false,

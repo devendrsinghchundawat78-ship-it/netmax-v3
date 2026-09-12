@@ -158,6 +158,17 @@ object LiquidGlassDefaults {
     }
 }
 
+/**
+ * Icon/text color for content drawn on a glass surface. While liquid glass is
+ * enabled the user-configured glass text color is used (default white, which
+ * reads well over the translucent glass). When glass is disabled the surface
+ * falls back to the theme's opaque surface, where that same white would be
+ * invisible in a light theme — so the theme's onSurface color is used instead.
+ */
+@Composable
+fun LiquidGlassSettings.adaptiveContentColor(): Color =
+    if (enabled) textColor else MaterialTheme.colorScheme.onSurface
+
 @Composable
 fun Modifier.liquidGlass(
     shape: Shape = LiquidGlassDefaults.PillShape,
@@ -226,7 +237,7 @@ fun LiquidGlassIconButton(
     val interactionSource = remember { MutableInteractionSource() }
     LiquidGlassSettingsRepository.ensureLoaded()
     val settings by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
-    val resolvedTint = tint ?: settings.textColor
+    val resolvedTint = tint ?: settings.adaptiveContentColor()
 
     BoxWithLiquidGlassButton(
         onClick = onClick,
@@ -327,7 +338,7 @@ fun LiquidGlassTopBar(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = settings.textColor,
+                    color = settings.adaptiveContentColor(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(horizontal = 4.dp),
