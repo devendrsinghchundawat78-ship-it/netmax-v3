@@ -151,3 +151,20 @@
 -keep class com.nuvio.app.features.details.MetaDetailsScreenKt$* { *; }
 -keep class com.nuvio.app.features.home.components.HomeContinueWatchingSectionKt { *; }
 -keep class com.nuvio.app.features.home.components.HomeContinueWatchingSectionKt$* { *; }
+
+# ---------------------------------------------------------------------------
+# R8 class-merging hardening (v3.1.1 Build 26 crash).
+# AGP 9.2's R8 merged two same-interface CompositionLocal helper classes in
+# the profile-selection flow, producing a check-cast mismatch
+# ("ClassCastException: ex4 cannot be cast to we7") the moment the
+# manage-profiles Add action recomposed the app gate. Same family of
+# bytecode corruption as the Streams/Player R8 breakage documented above.
+# Class merging is disabled globally; the profile-gate classes are kept
+# explicitly as belt-and-braces.
+-optimizations !classmerging/*
+-keep class com.nuvio.app.AppGateKt { *; }
+-keep class com.nuvio.app.AppGateKt$* { *; }
+-keep class com.nuvio.app.features.profiles.ProfileSelectionScreenKt { *; }
+-keep class com.nuvio.app.features.profiles.ProfileSelectionScreenKt$* { *; }
+-keep class com.nuvio.app.features.profiles.ProfileEditScreenKt { *; }
+-keep class com.nuvio.app.features.profiles.ProfileEditScreenKt$* { *; }
