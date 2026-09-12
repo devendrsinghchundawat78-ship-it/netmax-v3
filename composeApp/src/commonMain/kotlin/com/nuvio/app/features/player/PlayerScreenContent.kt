@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -79,6 +80,20 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
 
     val runtime = remember { PlayerScreenRuntime(args) }
     runtime.args = args
+
+    // Seed the player's source list from the search the user just came from:
+    // automatic source failover gets candidates immediately (a broken source can
+    // hop to a working one instead of showing an error), and the sources panel
+    // opens with the previous results instead of re-running the whole search.
+    LaunchedEffect(runtime.activeVideoId, runtime.activeSeasonNumber, runtime.activeEpisodeNumber) {
+        val vid = runtime.activeVideoId ?: return@LaunchedEffect
+        PlayerStreamsRepository.seedFromStreamsRepository(
+            type = runtime.contentType ?: runtime.parentMetaType,
+            videoId = vid,
+            season = runtime.activeSeasonNumber,
+            episode = runtime.activeEpisodeNumber,
+        )
+    }
 
     BoxWithConstraints(
         modifier = args.modifier

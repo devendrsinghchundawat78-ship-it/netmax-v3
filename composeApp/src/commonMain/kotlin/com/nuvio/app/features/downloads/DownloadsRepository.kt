@@ -1,6 +1,11 @@
 package com.nuvio.app.features.downloads
 
+import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.streams.StreamItem
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +21,8 @@ import org.jetbrains.compose.resources.getString
 object DownloadsRepository {
     private val _uiState = MutableStateFlow(DownloadsUiState())
     val uiState: StateFlow<DownloadsUiState> = _uiState.asStateFlow()
+
+    private val smartRetryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val activeHandles = mutableMapOf<String, DownloadsTaskHandle>()
     private var hasLoaded = false
@@ -240,8 +247,59 @@ object DownloadsRepository {
         startDownload(reset)
     }
 
+    /**
+     * Retry for failed downloads. A plain restart is enough for transient network
+     * errors, but a dead source (HTTP 403/404/410 …) fails forever, so those
+     * retries re-resolve the source list first and swap to the next-best working
+     * source; if nothing better is found the original URL is retried as before.
+     */
     fun retryDownload(downloadId: String) {
-        resumeDownload(downloadId)
+        ensureLoaded()
+        val item = _uiState.value.items.firstOrNull { it.id == downloadId } ?: return
+        val failedWithHttpError = item.status == DownloadStatus.Failed &&
+            item.errorMessage?.contains("HTTP", ignoreCase = true) == true
+        if (!failedWithHttpError) {
+            resumeDownload(downloadId)
+            return
+        }
+
+        NuvioToastController.show(
+            runBlocking { getString(Res.string.downloads_finding_sources) },
+        )
+        smartRetryScope.launch {
+            val sources = runCatching {
+                DownloadSourceResolver.loadDownloadableSources(
+                    type = item.contentType,
+                    videoId = item.videoId,
+                    season = item.seasonNumber,
+                    episode = item.episodeNumber,
+                )
+            }.getOrDefault(emptyList())
+            val replacement = DownloadSourceResolver.bestSource(
+                sources.filterNot { it.playableDirectUrl == item.sourceUrl },
+            )
+            if (replacement == null) {
+                resumeDownload(downloadId)
+                return@launch
+            }
+            // The user may have deleted the download while sources were resolving.
+            if (_uiState.value.items.none { it.id == downloadId }) return@launch
+            enqueueFromStream(
+                contentType = item.contentType,
+                videoId = item.videoId,
+                parentMetaId = item.parentMetaId,
+                parentMetaType = item.parentMetaType,
+                title = item.title,
+                logo = item.logo,
+                poster = item.poster,
+                background = item.background,
+                seasonNumber = item.seasonNumber,
+                episodeNumber = item.episodeNumber,
+                episodeTitle = item.episodeTitle,
+                episodeThumbnail = item.episodeThumbnail,
+                stream = replacement,
+            )
+        }
     }
 
     fun cancelDownload(downloadId: String) {

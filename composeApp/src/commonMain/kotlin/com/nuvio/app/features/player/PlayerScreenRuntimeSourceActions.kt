@@ -234,10 +234,15 @@ internal fun PlayerScreenRuntime.tryAutomaticSourceFailover(): Boolean {
 
     if (!automaticSourceFailoverAttempts.add(failedIdentity)) return false
 
+    // Exclude every identity that already failed this session, not just the
+    // latest one — otherwise A -> B can fail straight back to A and ping-pong.
+    val attemptedIdentities = automaticSourceFailoverAttempts
     val candidates = PlayerStreamsRepository.sourceState.value.groups
         .flatMap { it.streams }
         .filter { stream ->
-            stream.playerSourceIdentityKey() != failedIdentity &&
+            val identity = stream.playerSourceIdentityKey() ?: return@filter false
+            identity != failedIdentity &&
+                identity !in attemptedIdentities &&
                 stream.playableDirectUrl != null
         }
         .distinctBy { it.playerSourceIdentityKey() }
@@ -435,8 +440,18 @@ internal fun PlayerScreenRuntime.playNextEpisode() {
 
 internal fun PlayerScreenRuntime.openSourcesPanel() {
     val vid = activeVideoId ?: return
+    val type = contentType ?: parentMetaType
+    // Reuse the sources the user already searched for: seeding makes the
+    // loadSources call below a no-op, so the panel opens instantly with the
+    // previous results instead of restarting the whole addon search.
+    PlayerStreamsRepository.seedFromStreamsRepository(
+        type = type,
+        videoId = vid,
+        season = activeSeasonNumber,
+        episode = activeEpisodeNumber,
+    )
     PlayerStreamsRepository.loadSources(
-        type = contentType ?: parentMetaType,
+        type = type,
         videoId = vid,
         season = activeSeasonNumber,
         episode = activeEpisodeNumber,

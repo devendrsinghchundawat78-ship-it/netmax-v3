@@ -23,6 +23,7 @@ import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamLoadCompletion
 import com.nuvio.app.features.streams.StreamParser
+import com.nuvio.app.features.streams.StreamsRepository
 import com.nuvio.app.features.streams.StreamsUiState
 import com.nuvio.app.features.streams.runCatchingUnlessCancelled
 import com.nuvio.app.features.streams.sortedForGroupedDisplay
@@ -103,6 +104,62 @@ object PlayerStreamsRepository {
             jobHolder = { episodeStreamsJob },
             setJob = { episodeStreamsJob = it },
         )
+    }
+
+    /**
+     * Copies an already-completed main-repo ([StreamsRepository]) search into this
+     * repository's source state. After picking a source from the search screen the
+     * player can then show the same list instantly (sources panel) and use it for
+     * automatic source failover, instead of re-running the whole addon search.
+     */
+    fun seedFromStreamsRepository(
+        type: String,
+        videoId: String,
+        season: Int? = null,
+        episode: Int? = null,
+    ) {
+        val pluginUiState = if (AppFeaturePolicy.pluginsEnabled) {
+            PluginRepository.initialize()
+            PluginRepository.uiState.value
+        } else {
+            PluginsUiState(pluginsEnabled = false)
+        }
+        val requestKey = "$type::$videoId::$season::$episode::pluginsGrouped=${pluginUiState.groupStreamsByRepository}"
+        val current = _sourceState.value
+        if (
+            sourceRequestKey == requestKey &&
+            (current.groups.isNotEmpty() || current.emptyStateReason != null)
+        ) {
+            return
+        }
+
+        val mainState = StreamsRepository.uiState.value
+        val mainToken = mainState.requestToken ?: return
+        val matchesMainSearch = listOf(false, true).any { manualSelection ->
+            mainToken == StreamsRepository.requestToken(
+                type = type,
+                videoId = videoId,
+                season = season,
+                episode = episode,
+                manualSelection = manualSelection,
+            )
+        }
+        if (!matchesMainSearch) return
+        // Never copy a half-finished search: the copied per-group loading flags
+        // would never clear, because the main repo drives those updates.
+        if (mainState.isAnyLoading) return
+        if (mainState.groups.isEmpty()) return
+
+        sourceJob?.cancel()
+        _sourceState.value = mainState.copy(
+            selectedFilter = null,
+            autoPlayStream = null,
+            autoPlayCandidates = emptyList(),
+            isDirectAutoPlayFlow = false,
+            showDirectAutoPlayOverlay = false,
+            overlayMessage = null,
+        )
+        sourceRequestKey = requestKey
     }
 
     fun selectSourceFilter(addonId: String?) {
