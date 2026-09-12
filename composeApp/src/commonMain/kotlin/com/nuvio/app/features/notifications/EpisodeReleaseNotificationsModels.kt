@@ -10,6 +10,7 @@ import nuvio.composeapp.generated.resources.notifications_episode_release_body_c
 import nuvio.composeapp.generated.resources.notifications_episode_release_body_code_title
 import nuvio.composeapp.generated.resources.notifications_episode_release_body_generic
 import nuvio.composeapp.generated.resources.notifications_episode_release_body_title
+import nuvio.composeapp.generated.resources.notifications_movie_release_body
 import org.jetbrains.compose.resources.getString
 import kotlin.math.abs
 
@@ -62,6 +63,12 @@ internal fun normalizeSeriesType(type: String): String = when (type.trim().lower
 
 internal fun isSeriesLibraryType(type: String): Boolean = normalizeSeriesType(type) == "series"
 
+/** Movies are tracked too: a saved movie notifies on its release day. */
+internal fun isMovieLibraryType(type: String): Boolean = type.trim().lowercase() == "movie"
+
+internal fun isReleaseNotifiableLibraryType(type: String): Boolean =
+    isSeriesLibraryType(type) || isMovieLibraryType(type)
+
 internal fun releaseDateIso(rawValue: String?): String? {
     return parseEpisodeReleaseLocalDate(rawValue)
 }
@@ -76,6 +83,11 @@ internal fun buildEpisodeReleaseNotificationId(
     val contentHash = abs(buildTrackedShowKey(contentType, contentId).hashCode())
     val episodeHash = abs(episodeId.trim().ifBlank { releaseDateIso }.hashCode())
     return "episode-release-$profileId-$contentHash-$episodeHash-$releaseDateIso"
+}
+
+/** Body for a saved movie's release-day notification. */
+internal fun buildMovieReleaseNotificationBody(): String = runBlocking {
+    getString(Res.string.notifications_movie_release_body)
 }
 
 internal fun buildEpisodeReleaseNotificationBody(

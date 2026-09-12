@@ -22,6 +22,7 @@ internal actual object DownloadsLiveStatusPlatform {
     private const val channelId = "downloads_live_status"
     private const val notificationsPrefName = "nuvio_download_live_notifications"
     private const val trackedDownloadIdsKey = "tracked_download_ids"
+    private const val wasDownloadingIdsKey = "was_downloading_ids"
 
     private var appContext: Context? = null
     private val lastRenderStateById = mutableMapOf<String, RenderState>()
@@ -33,8 +34,6 @@ internal actual object DownloadsLiveStatusPlatform {
 
     actual fun onItemsChanged(items: List<DownloadItem>) {
         val context = appContext ?: return
-        if (!canPostNotifications(context)) return
-
         val manager = NotificationManagerCompat.from(context)
         val trackedBefore = preferences(context)
             .getStringSet(trackedDownloadIdsKey, emptySet())
@@ -46,6 +45,22 @@ internal actual object DownloadsLiveStatusPlatform {
                 item.status == DownloadStatus.Paused ||
                 item.status == DownloadStatus.Failed
         }
+        val downloadingItems = items.filter { item -> item.status == DownloadStatus.Downloading }
+        val downloadingIds = downloadingItems.map { it.id }.toSet()
+
+        // Keep a dataSync foreground service alive while anything is downloading so
+        // the process (and with it the downloads + these very notifications) survives
+        // the app being backgrounded. Runs before the notification-permission check on
+        // purpose: downloads must keep running in the background even when the user
+        // has denied notification posting (the FGS just runs without a visible card).
+        DownloadsForegroundService.sync(context, downloadingItems.size)
+        DownloadsForegroundService.notifyProgress(context, downloadingItems)
+        preferences(context)
+            .edit()
+            .putStringSet(wasDownloadingIdsKey, downloadingIds)
+            .apply()
+
+        if (!canPostNotifications(context)) return
 
         val trackedNow = mutableSetOf<String>()
         activeItems.forEach { item ->
@@ -78,6 +93,30 @@ internal actual object DownloadsLiveStatusPlatform {
             .edit()
             .putStringSet(trackedDownloadIdsKey, trackedNow)
             .apply()
+    }
+
+    /**
+     * Ids that were actively downloading when the process last went down. Consumed by
+     * [DownloadsForegroundService] after a sticky restart so those downloads resume
+     * automatically while user-paused items stay untouched.
+     */
+    fun consumeInterruptedDownloadIds(): Set<String> {
+        val context = appContext ?: return emptySet()
+        val wasDownloading = preferences(context)
+            .getStringSet(wasDownloadingIdsKey, emptySet())
+            .orEmpty()
+            .toMutableSet()
+        // Drop the ones that are no longer relevant (completed/removed meanwhile).
+        val stillRelevant = DownloadsRepository.uiState.value.items
+            .filter { it.id in wasDownloading }
+            .filter { it.status == DownloadStatus.Paused || it.status == DownloadStatus.Failed }
+            .map { it.id }
+            .toSet()
+        preferences(context)
+            .edit()
+            .putStringSet(wasDownloadingIdsKey, emptySet<String>())
+            .apply()
+        return stillRelevant
     }
 
     private fun buildNotification(context: Context, item: DownloadItem): android.app.Notification {

@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:allowBackup="false"
@@ -172,6 +173,14 @@
         <receiver
             android:name="com.nuvio.app.features.downloads.DownloadsNotificationActionReceiver"
             android:exported="false" />
+
+        <!-- Keeps the process alive (dataSync foreground priority) while downloads
+             run so backgrounding the app no longer stalls or kills them. -->
+        <service
+            android:name="com.nuvio.app.features.downloads.DownloadsForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:stopWithTask="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

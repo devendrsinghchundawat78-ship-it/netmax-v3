@@ -1909,6 +1909,9 @@
     <string name="notifications_episode_release_body_code">%1$s is out now</string>
     <string name="notifications_episode_release_body_code_title">%1$s • %2$s is out now</string>
     <string name="notifications_episode_release_body_generic">A new episode is out now</string>
+    <string name="notifications_movie_release_body">Out now — stream it on NetMax</string>
+    <string name="downloads_foreground_summary">NetMax is downloading in the background</string>
+    <string name="downloads_foreground_count">%1$d active downloads</string>
     <string name="notifications_episode_release_body_title">%1$s is out now</string>
     <string name="notifications_channel_episode_releases_name">Episode Releases</string>
     <string name="parental_alcohol">Alcohol/Drugs</string>

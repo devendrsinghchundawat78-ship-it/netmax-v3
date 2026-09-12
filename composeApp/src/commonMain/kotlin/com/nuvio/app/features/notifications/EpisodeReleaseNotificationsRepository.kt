@@ -308,10 +308,10 @@ object EpisodeReleaseNotificationsRepository {
     private fun reconcileTrackedShows(state: LibraryUiState): Boolean {
         if (!state.isLoaded) return false
 
-        val seriesItems = state.items.filter { item -> isSeriesLibraryType(item.type) }
+        val notifiableItems = state.items.filter { item -> isReleaseNotifiableLibraryType(item.type) }
         val nextTrackedShows = linkedMapOf<String, TrackedFollowedShow>()
 
-        seriesItems.forEach { item ->
+        notifiableItems.forEach { item ->
             val key = buildTrackedShowKey(item.type, item.id)
             nextTrackedShows[key] = trackedShowsByKey[key]
                 ?: TrackedFollowedShow(
@@ -443,6 +443,32 @@ object EpisodeReleaseNotificationsRepository {
         }.getOrNull() ?: return emptyList()
 
         val showTitle = meta.name.ifBlank { trackedShow.contentId }
+
+        // Movies: one notification on the movie's own release day.
+        if (isMovieLibraryType(trackedShow.contentType)) {
+            val releaseDate = releaseDateIso(meta.releaseInfo) ?: return emptyList()
+            if (releaseDate < trackedShow.followedOnIsoDate) return emptyList()
+            return listOf(
+                EpisodeReleaseNotificationRequest(
+                    requestId = buildEpisodeReleaseNotificationId(
+                        profileId = ProfileRepository.activeProfileId,
+                        contentType = trackedShow.contentType,
+                        contentId = trackedShow.contentId,
+                        episodeId = "release",
+                        releaseDateIso = releaseDate,
+                    ),
+                    notificationTitle = showTitle,
+                    notificationBody = buildMovieReleaseNotificationBody(),
+                    releaseDateIso = releaseDate,
+                    deepLinkUrl = buildMetaDeepLinkUrl(
+                        type = trackedShow.contentType,
+                        id = trackedShow.contentId,
+                    ),
+                    backdropUrl = meta.background ?: meta.poster,
+                ),
+            )
+        }
+
         return meta.videos.mapNotNull { episode ->
             val releaseDate = releaseDateIso(episode.released) ?: return@mapNotNull null
             if (releaseDate < trackedShow.followedOnIsoDate) return@mapNotNull null
