@@ -670,6 +670,11 @@
     <string name="settings_appearance_app_icon_copper">Copper</string>
     <string name="settings_appearance_app_icon_emerald">Emerald</string>
     <string name="settings_appearance_app_icon_graphite">Graphite</string>
+    <string name="settings_appearance_app_icon_crimson">Crimson</string>
+    <string name="settings_appearance_app_icon_violet">Violet</string>
+    <string name="settings_appearance_app_icon_teal">Teal</string>
+    <string name="settings_appearance_app_icon_magenta">Magenta</string>
+    <string name="settings_appearance_app_icon_amber">Amber</string>
     <string name="settings_appearance_app_icon_original">Original</string>
     <string name="settings_appearance_app_icon_rose_gold">Rose Gold</string>
     <string name="settings_appearance_app_icon_sheet_title">Choose App Icon</string>

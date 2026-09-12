@@ -585,6 +585,11 @@
     <string name="settings_appearance_app_icon_copper">Bakır</string>
     <string name="settings_appearance_app_icon_emerald">Zümrüt</string>
     <string name="settings_appearance_app_icon_graphite">Grafit</string>
+    <string name="settings_appearance_app_icon_crimson">Kızıl</string>
+    <string name="settings_appearance_app_icon_violet">Mor</string>
+    <string name="settings_appearance_app_icon_teal">Turkuaz</string>
+    <string name="settings_appearance_app_icon_magenta">Macenta</string>
+    <string name="settings_appearance_app_icon_amber">Kehribar</string>
     <string name="settings_appearance_app_icon_original">Orijinal</string>
     <string name="settings_appearance_app_icon_rose_gold">Roze Altın</string>
     <string name="settings_appearance_app_icon_sheet_title">Uygulama Simgesi Seçin</string>

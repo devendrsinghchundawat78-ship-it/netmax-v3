@@ -10,4 +10,9 @@
     <style name="Theme.Nuvio.Splash.RoseGold" parent="@style/Theme.Nuvio.Splash" />
     <style name="Theme.Nuvio.Splash.Copper" parent="@style/Theme.Nuvio.Splash" />
     <style name="Theme.Nuvio.Splash.Graphite" parent="@style/Theme.Nuvio.Splash" />
+    <style name="Theme.Nuvio.Splash.Crimson" parent="@style/Theme.Nuvio.Splash" />
+    <style name="Theme.Nuvio.Splash.Violet" parent="@style/Theme.Nuvio.Splash" />
+    <style name="Theme.Nuvio.Splash.Teal" parent="@style/Theme.Nuvio.Splash" />
+    <style name="Theme.Nuvio.Splash.Magenta" parent="@style/Theme.Nuvio.Splash" />
+    <style name="Theme.Nuvio.Splash.Amber" parent="@style/Theme.Nuvio.Splash" />
 </resources>

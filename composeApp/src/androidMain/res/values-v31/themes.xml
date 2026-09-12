@@ -29,4 +29,24 @@
     <style name="Theme.Nuvio.Splash.Graphite" parent="@style/Theme.Nuvio.Splash">
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo_graphite</item>
     </style>
+
+    <style name="Theme.Nuvio.Splash.Crimson" parent="@style/Theme.Nuvio.Splash">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo_crimson</item>
+    </style>
+
+    <style name="Theme.Nuvio.Splash.Violet" parent="@style/Theme.Nuvio.Splash">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo_violet</item>
+    </style>
+
+    <style name="Theme.Nuvio.Splash.Teal" parent="@style/Theme.Nuvio.Splash">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo_teal</item>
+    </style>
+
+    <style name="Theme.Nuvio.Splash.Magenta" parent="@style/Theme.Nuvio.Splash">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo_magenta</item>
+    </style>
+
+    <style name="Theme.Nuvio.Splash.Amber" parent="@style/Theme.Nuvio.Splash">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo_amber</item>
+    </style>
 </resources>

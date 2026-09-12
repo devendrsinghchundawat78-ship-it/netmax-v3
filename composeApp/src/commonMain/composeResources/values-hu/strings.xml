@@ -2005,6 +2005,11 @@
     <string name="settings_appearance_app_icon_copper">Rézvörös</string>
     <string name="settings_appearance_app_icon_emerald">Smaragdzöld</string>
     <string name="settings_appearance_app_icon_graphite">Grafitszürke</string>
+    <string name="settings_appearance_app_icon_crimson">Bordó</string>
+    <string name="settings_appearance_app_icon_violet">Viola</string>
+    <string name="settings_appearance_app_icon_teal">Pávakék</string>
+    <string name="settings_appearance_app_icon_magenta">Magenta</string>
+    <string name="settings_appearance_app_icon_amber">Borostyán</string>
     <string name="settings_appearance_app_icon_original">Eredeti</string>
     <string name="settings_appearance_app_icon_rose_gold">Rózsaarany</string>
     <string name="settings_appearance_app_icon_sheet_title">Válassz alkalmazásikont</string>

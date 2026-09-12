@@ -661,6 +661,11 @@
     <string name="settings_appearance_app_icon_copper">Мед</string>
     <string name="settings_appearance_app_icon_emerald">Изомруд</string>
     <string name="settings_appearance_app_icon_graphite">Графит</string>
+    <string name="settings_appearance_app_icon_crimson">Рубинен</string>
+    <string name="settings_appearance_app_icon_violet">Виолетово</string>
+    <string name="settings_appearance_app_icon_teal">Петрол</string>
+    <string name="settings_appearance_app_icon_magenta">Пурпурен</string>
+    <string name="settings_appearance_app_icon_amber">Кехлибарен</string>
     <string name="settings_appearance_app_icon_original">Оригинална</string>
     <string name="settings_appearance_app_icon_rose_gold">Розово злато</string>
     <string name="settings_appearance_app_icon_sheet_title">Изберете икона</string>

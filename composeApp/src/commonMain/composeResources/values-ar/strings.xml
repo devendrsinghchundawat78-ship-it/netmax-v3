@@ -598,6 +598,11 @@
     <string name="settings_appearance_app_icon_copper">نحاسي</string>
     <string name="settings_appearance_app_icon_emerald">الزمردي</string>
     <string name="settings_appearance_app_icon_graphite">غرافيت</string>
+    <string name="settings_appearance_app_icon_crimson">قرمزي</string>
+    <string name="settings_appearance_app_icon_violet">البنفسجي</string>
+    <string name="settings_appearance_app_icon_teal">تركوازي</string>
+    <string name="settings_appearance_app_icon_magenta">أرجواني</string>
+    <string name="settings_appearance_app_icon_amber">كهرماني</string>
     <string name="settings_appearance_app_icon_original">الأصلية</string>
     <string name="settings_appearance_app_icon_rose_gold">ذهبي وردي</string>
     <string name="settings_appearance_app_icon_sheet_title">اختر أيقونة التطبيق</string>

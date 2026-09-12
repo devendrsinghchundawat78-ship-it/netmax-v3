@@ -23,8 +23,11 @@ internal fun AppBrandWordmark(
         AppIconRepository.ensureLoaded()
         AppIconRepository.state
     }.collectAsStateWithLifecycle()
+    // The in-app logo follows the chosen app icon option: the classic red
+    // NetMax wordmark by default, a colour-matched variant for the rest.
+    val effectiveIcon = icon ?: state.selected
     Image(
-        painter = painterResource(Res.drawable.netmax_logo),
+        painter = painterResource(effectiveIcon.brandWordmarkResource),
         contentDescription = contentDescription,
         modifier = modifier,
         contentScale = ContentScale.Fit,

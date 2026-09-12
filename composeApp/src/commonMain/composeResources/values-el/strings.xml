@@ -388,6 +388,11 @@
     <string name="settings_appearance_app_icon_copper">Χαλκός</string>
     <string name="settings_appearance_app_icon_emerald">Σμαράγδι</string>
     <string name="settings_appearance_app_icon_graphite">Γραφίτης</string>
+    <string name="settings_appearance_app_icon_crimson">Βυσσινί</string>
+    <string name="settings_appearance_app_icon_violet">Μενεξί</string>
+    <string name="settings_appearance_app_icon_teal">Τιρκουάζ</string>
+    <string name="settings_appearance_app_icon_magenta">Πορφυρό</string>
+    <string name="settings_appearance_app_icon_amber">Κεχριμπάρι</string>
     <string name="settings_appearance_app_icon_original">Αρχικό</string>
     <string name="settings_appearance_app_icon_rose_gold">Ροζ χρυσό</string>
     <string name="settings_appearance_app_icon_sheet_title">Επιλογή εικονιδίου εφαρμογής</string>

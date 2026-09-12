@@ -585,6 +585,11 @@
     <string name="settings_appearance_app_icon_copper">Koper</string>
     <string name="settings_appearance_app_icon_emerald">Smaragdgroen</string>
     <string name="settings_appearance_app_icon_graphite">Grafiet</string>
+    <string name="settings_appearance_app_icon_crimson">Karmozijn</string>
+    <string name="settings_appearance_app_icon_violet">Violet</string>
+    <string name="settings_appearance_app_icon_teal">Turkoois</string>
+    <string name="settings_appearance_app_icon_magenta">Magenta</string>
+    <string name="settings_appearance_app_icon_amber">Amber</string>
     <string name="settings_appearance_app_icon_original">Origineel</string>
     <string name="settings_appearance_app_icon_rose_gold">Roségoud</string>
     <string name="settings_appearance_app_icon_sheet_title">Kies app-pictogram</string>
