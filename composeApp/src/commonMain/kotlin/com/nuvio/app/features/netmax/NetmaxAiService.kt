@@ -52,7 +52,12 @@ object NetmaxAiService {
     }
 
     private suspend fun call(body: kotlinx.serialization.json.JsonObject): kotlinx.serialization.json.JsonElement {
-        val response = NetmaxSupabaseProvider.client.functions.invoke("netmax-ai", body)
+        val client = if (SupabaseProvider.client.auth.currentSessionOrNull() != null) {
+            SupabaseProvider.client
+        } else {
+            NetmaxSupabaseProvider.client
+        }
+        val response = client.functions.invoke("netmax-ai", body)
         val text = response.bodyAsText()
         val element = json.parseToJsonElement(text)
         val obj = element.jsonObject

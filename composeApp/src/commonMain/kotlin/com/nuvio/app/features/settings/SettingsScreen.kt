@@ -705,11 +705,15 @@ private fun MobileSettingsScreen(
                             onNetmaxAiClick = onNetmaxAiClick,
                             onSwitchProfileClick = onSwitchProfile,
                             onQuickWatchClick = { onPageChange(SettingsPage.QuickWatch) },
+                            onMusicClick = { onPageChange(SettingsPage.Music) },
                             showSupportersContributorsPage = AppFeaturePolicy.supportersContributorsPageEnabled,
                         )
                     }
                 }
                 SettingsPage.QuickWatch -> quickWatchSettingsContent(
+                    isTablet = false,
+                )
+                SettingsPage.Music -> musicSettingsContent(
                     isTablet = false,
                 )
                 SettingsPage.Account -> accountSettingsContent(
@@ -1133,6 +1137,7 @@ private fun TabletSettingsScreen(
                                 onAccountClick = { openInlinePage(SettingsPage.Account) },
                                 onSwitchProfileClick = onSwitchProfile,
                                 onQuickWatchClick = { openInlinePage(SettingsPage.QuickWatch) },
+                                onMusicClick = { openInlinePage(SettingsPage.Music) },
                                 showAccountSection = activeCategory == SettingsCategory.Account,
                                 showGeneralSection = activeCategory == SettingsCategory.General,
                                 showAboutSection = activeCategory == SettingsCategory.About,
@@ -1142,6 +1147,9 @@ private fun TabletSettingsScreen(
                         }
                     }
                     SettingsPage.QuickWatch -> quickWatchSettingsContent(
+                        isTablet = true,
+                    )
+                    SettingsPage.Music -> musicSettingsContent(
                         isTablet = true,
                     )
                     SettingsPage.Account -> accountSettingsContent(

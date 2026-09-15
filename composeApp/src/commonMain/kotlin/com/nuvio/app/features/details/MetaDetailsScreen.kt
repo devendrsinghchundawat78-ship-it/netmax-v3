@@ -2493,7 +2493,7 @@ private fun TabbedSectionGroup(
                     Text(
                         text = title,
                         style = headerStyle,
-                        color = if (index == selectedIndex) {
+                        color = if (index == clampedIndex) {
                             headerColor
                         } else {
                             headerColor.copy(alpha = 0.55f)
@@ -2510,8 +2510,9 @@ private fun TabbedSectionGroup(
         }
 
         // Content with crossfade
+        val activeTarget = tabs.getOrNull(clampedIndex)?.first ?: tabs.first().first
         Crossfade(
-            targetState = tabs[selectedIndex].first,
+            targetState = activeTarget,
             animationSpec = tween(durationMillis = 200),
             label = "tabbedSectionCrossfade",
         ) { activeKey ->

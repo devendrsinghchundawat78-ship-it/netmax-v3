@@ -32,6 +32,9 @@ import com.nuvio.app.core.ui.PlatformBackHandler
 import com.nuvio.app.core.ui.rememberNuvioNavBarScrollState
 import com.nuvio.app.features.profiles.NuvioProfile
 import com.nuvio.app.features.profiles.ProfileSwitcherTab
+import com.nuvio.app.features.music.MusicSettingsRepository
+import com.nuvio.app.features.music.ui.MusicFullPlayerSheet
+import com.nuvio.app.features.music.ui.MusicMiniPlayer
 import com.nuvio.app.features.quickwatch.QuickWatchSettings
 import com.nuvio.app.features.quickwatch.QuickWatchSettingsRepository
 import com.nuvio.app.features.settings.NavBarStyle
@@ -40,11 +43,13 @@ import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_nav_home
+import nuvio.composeapp.generated.resources.compose_nav_music
 import nuvio.composeapp.generated.resources.compose_nav_quick_watch
 import nuvio.composeapp.generated.resources.compose_nav_library
 import nuvio.composeapp.generated.resources.compose_nav_profile
 import nuvio.composeapp.generated.resources.compose_nav_search
 import nuvio.composeapp.generated.resources.sidebar_library
+import nuvio.composeapp.generated.resources.sidebar_music
 import nuvio.composeapp.generated.resources.sidebar_quick_watch
 import nuvio.composeapp.generated.resources.sidebar_search
 import org.jetbrains.compose.resources.stringResource
@@ -83,15 +88,23 @@ internal fun MainTabsDestination(
         val navBarStyleSetting by remember { ThemeSettingsRepository.navBarStyle }.collectAsStateWithLifecycle()
         QuickWatchSettingsRepository.ensureLoaded()
         val quickWatchSettings by QuickWatchSettingsRepository.settings.collectAsStateWithLifecycle()
-        val swipeTabs = remember(quickWatchSettings.enabled) {
-            if (quickWatchSettings.enabled) {
-                listOf(AppScreenTab.Home, AppScreenTab.Search, AppScreenTab.QuickWatch, AppScreenTab.Library, AppScreenTab.Settings)
-            } else {
-                listOf(AppScreenTab.Home, AppScreenTab.Search, AppScreenTab.Library, AppScreenTab.Settings)
+        MusicSettingsRepository.ensureLoaded()
+        val musicSettings by MusicSettingsRepository.settings.collectAsStateWithLifecycle()
+        val swipeTabs = remember(quickWatchSettings.enabled, musicSettings.enabled) {
+            buildList {
+                add(AppScreenTab.Home)
+                add(AppScreenTab.Search)
+                if (quickWatchSettings.enabled) add(AppScreenTab.QuickWatch)
+                if (musicSettings.enabled) add(AppScreenTab.Music)
+                add(AppScreenTab.Library)
+                add(AppScreenTab.Settings)
             }
         }
-        androidx.compose.runtime.LaunchedEffect(quickWatchSettings.enabled, selectedTab) {
+        androidx.compose.runtime.LaunchedEffect(quickWatchSettings.enabled, musicSettings.enabled, selectedTab) {
             if (!quickWatchSettings.enabled && selectedTab == AppScreenTab.QuickWatch) {
+                onTabSelected(AppScreenTab.Home)
+            }
+            if (!musicSettings.enabled && selectedTab == AppScreenTab.Music) {
                 onTabSelected(AppScreenTab.Home)
             }
         }
@@ -128,6 +141,14 @@ internal fun MainTabsDestination(
                                 onClick = { onTabSelected(AppScreenTab.QuickWatch) },
                                 icon = Res.drawable.sidebar_quick_watch,
                                 contentDescription = stringResource(Res.string.compose_nav_quick_watch),
+                            )
+                        }
+                        if (musicSettings.enabled) {
+                            NavItem(
+                                selected = selectedTab == AppScreenTab.Music,
+                                onClick = { onTabSelected(AppScreenTab.Music) },
+                                icon = Res.drawable.sidebar_music,
+                                contentDescription = stringResource(Res.string.compose_nav_music),
                             )
                         }
                         NavItem(
@@ -226,6 +247,15 @@ internal fun MainTabsDestination(
                                 label = stringResource(Res.string.compose_nav_quick_watch),
                             )
                         }
+                        if (musicSettings.enabled) {
+                            NavItem(
+                                selected = selectedTab == AppScreenTab.Music,
+                                onClick = { onTabSelected(AppScreenTab.Music) },
+                                icon = Res.drawable.sidebar_music,
+                                contentDescription = stringResource(Res.string.compose_nav_music),
+                                label = stringResource(Res.string.compose_nav_music),
+                            )
+                        }
                         NavItem(
                             selected = selectedTab == AppScreenTab.Library,
                             onClick = { onTabSelected(AppScreenTab.Library) },
@@ -247,6 +277,16 @@ internal fun MainTabsDestination(
                         }
                     }
                 }
+
+                if (!isTabletLayout && !useNativeBottomTabs) {
+                    MusicMiniPlayer(
+                        hazeState = navBarHazeState,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = if (navBarStyleSetting == NavBarStyle.CLASSIC) 64.dp else 84.dp),
+                    )
+                }
+                MusicFullPlayerSheet(hazeState = navBarHazeState)
             }
         }
     }

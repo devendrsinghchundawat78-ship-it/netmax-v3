@@ -214,7 +214,11 @@ fun NuvioPosterZoomActionOverlay(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .onGloballyPositioned { coordinates -> rootOrigin = coordinates.positionInRoot() }
+            .onGloballyPositioned { coordinates ->
+                if (coordinates.isAttached) {
+                    runCatching { rootOrigin = coordinates.positionInRoot() }
+                }
+            }
             .pointerInput(Unit) {
                 detectTapGestures { close() }
             },
@@ -262,7 +266,11 @@ fun NuvioPosterZoomActionOverlay(
             Box(
                 modifier = Modifier
                     .size(width = posterWidth, height = posterHeight)
-                    .onGloballyPositioned { coordinates -> slotBounds = coordinates.boundsInRoot() },
+                    .onGloballyPositioned { coordinates ->
+                        if (coordinates.isAttached) {
+                            runCatching { slotBounds = coordinates.boundsInRoot() }
+                        }
+                    },
             )
 
             Spacer(modifier = Modifier.height(NuvioTokens.Space.s18))

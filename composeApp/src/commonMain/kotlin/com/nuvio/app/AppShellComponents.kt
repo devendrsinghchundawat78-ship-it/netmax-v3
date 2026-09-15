@@ -47,6 +47,8 @@ import com.nuvio.app.features.library.LibraryItem
 import com.nuvio.app.features.library.LibraryScreen
 import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.library.LibrarySortOption
+import com.nuvio.app.features.music.MusicSettingsRepository
+import com.nuvio.app.features.music.ui.MusicScreen
 import com.nuvio.app.features.profiles.NuvioProfile
 import com.nuvio.app.features.profiles.ProfileBackgroundBackdrop
 import com.nuvio.app.features.profiles.ProfileSwitcherTab
@@ -61,10 +63,12 @@ import kotlinx.coroutines.flow.Flow
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.app_brand_name
 import nuvio.composeapp.generated.resources.compose_nav_home
+import nuvio.composeapp.generated.resources.compose_nav_music
 import nuvio.composeapp.generated.resources.compose_nav_library
 import nuvio.composeapp.generated.resources.compose_nav_profile
 import nuvio.composeapp.generated.resources.compose_nav_search
 import nuvio.composeapp.generated.resources.sidebar_library
+import nuvio.composeapp.generated.resources.sidebar_music
 import nuvio.composeapp.generated.resources.sidebar_search
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -187,6 +191,12 @@ internal fun AppTabHost(
                     )
                 }
 
+                AppScreenTab.Music -> {
+                    MusicScreen(
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
                 AppScreenTab.Library -> {
                     LibraryScreen(
                         modifier = Modifier.fillMaxSize(),
@@ -290,6 +300,26 @@ internal fun TabletFloatingTopBar(
                         )
                     },
                 )
+                val musicSettings by MusicSettingsRepository.settings.collectAsStateWithLifecycle()
+                if (musicSettings.enabled) {
+                    TabletTopPillItem(
+                        label = stringResource(Res.string.compose_nav_music),
+                        selected = selectedTab == AppScreenTab.Music,
+                        onClick = { onTabSelected(AppScreenTab.Music) },
+                        icon = {
+                            Icon(
+                                painter = painterResource(Res.drawable.sidebar_music),
+                                contentDescription = stringResource(Res.string.compose_nav_music),
+                                modifier = Modifier.size(NuvioTokens.Space.s18),
+                                tint = if (selectedTab == AppScreenTab.Music) {
+                                    tokens.colors.textPrimary
+                                } else {
+                                    tokens.colors.textMuted
+                                },
+                            )
+                        },
+                    )
+                }
                 TabletTopPillItem(
                     label = stringResource(Res.string.compose_nav_library),
                     selected = selectedTab == AppScreenTab.Library,

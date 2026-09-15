@@ -202,14 +202,14 @@ private class HeroTrailerTextureContainer(
 
     fun attachPlayer(player: ExoPlayer) {
         if (attachedPlayer === player) return
-        attachedPlayer?.clearVideoTextureView(textureView)
+        runCatching { attachedPlayer?.clearVideoTextureView(textureView) }
         attachedPlayer = player
-        player.setVideoTextureView(textureView)
+        runCatching { player.setVideoTextureView(textureView) }
     }
 
     fun detachPlayer(player: ExoPlayer) {
         if (attachedPlayer === player) {
-            player.clearVideoTextureView(textureView)
+            runCatching { player.clearVideoTextureView(textureView) }
             attachedPlayer = null
         }
     }

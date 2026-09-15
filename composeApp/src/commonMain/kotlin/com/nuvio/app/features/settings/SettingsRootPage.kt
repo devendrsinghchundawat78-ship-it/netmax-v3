@@ -14,6 +14,7 @@ import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.People
@@ -38,6 +39,7 @@ import nuvio.composeapp.generated.resources.compose_settings_page_integrations
 import nuvio.composeapp.generated.resources.compose_settings_page_licenses_attributions
 import nuvio.composeapp.generated.resources.compose_settings_page_notifications
 import nuvio.composeapp.generated.resources.compose_settings_page_playback
+import nuvio.composeapp.generated.resources.compose_nav_music
 import nuvio.composeapp.generated.resources.compose_nav_quick_watch
 import nuvio.composeapp.generated.resources.compose_settings_page_privacy_policy
 import nuvio.composeapp.generated.resources.compose_settings_page_supporters_contributors
@@ -88,6 +90,7 @@ internal fun LazyListScope.settingsRootContent(
     onNetmaxAiClick: (() -> Unit)? = null,
     onSwitchProfileClick: (() -> Unit)? = null,
     onQuickWatchClick: (() -> Unit)? = null,
+    onMusicClick: (() -> Unit)? = null,
     showAccountSection: Boolean = true,
     showGeneralSection: Boolean = true,
     showAboutSection: Boolean = true,
@@ -202,6 +205,16 @@ internal fun LazyListScope.settingsRootContent(
                             icon = Icons.Rounded.AutoAwesome,
                             isTablet = isTablet,
                             onClick = onQuickWatchClick,
+                        )
+                    }
+                    if (onMusicClick != null) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.compose_nav_music),
+                            description = "Configure music streaming quality, downloads, and playback",
+                            icon = Icons.Rounded.MusicNote,
+                            isTablet = isTablet,
+                            onClick = onMusicClick,
                         )
                     }
                 }

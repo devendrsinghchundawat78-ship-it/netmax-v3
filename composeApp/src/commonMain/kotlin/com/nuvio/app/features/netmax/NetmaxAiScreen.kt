@@ -77,6 +77,7 @@ import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.ui.LiquidGlassBackButton
 import com.nuvio.app.core.ui.LiquidGlassDefaults
 import com.nuvio.app.core.ui.ThemeColors
+import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.core.ui.liquidGlass
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.settings.ThemeSettingsRepository
@@ -109,9 +110,10 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     var error by remember { mutableStateOf<String?>(null) }
 
     val isAnonymous = authState is AuthState.Authenticated && (authState as AuthState.Authenticated).isAnonymous
+    val isAuthenticated = authState is AuthState.Authenticated && !isAnonymous
 
     LaunchedEffect(authState) {
-        if (authState is AuthState.Authenticated && !isAnonymous) {
+        if (isAuthenticated) {
             runCatching { NetmaxAiService.history() }.onSuccess { history ->
                 messages.clear()
                 messages.addAll(
@@ -208,7 +210,7 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         )
                         .border(
                             width = 1.dp,
-                            brush = Brush.linearGradient(themePalette.accentGradient),
+                            brush = themePalette.accentBrush(),
                             shape = CircleShape,
                         ),
                     contentAlignment = Alignment.Center,
@@ -294,8 +296,8 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             }
         }
 
-        // --- Anonymous State Warning ---
-        if (isAnonymous) {
+        // --- Unauthenticated / Anonymous State Warning ---
+        if (!isAuthenticated) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -376,7 +378,7 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                                 )
                                 .border(
                                     width = 1.5.dp,
-                                    brush = Brush.linearGradient(themePalette.accentGradient),
+                                    brush = themePalette.accentBrush(),
                                     shape = CircleShape,
                                 ),
                             contentAlignment = Alignment.Center,
@@ -563,7 +565,7 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                                                 .background(themePalette.backgroundElevated)
                                                 .border(
                                                     width = 1.dp,
-                                                    brush = Brush.linearGradient(themePalette.accentGradient),
+                                                    brush = themePalette.accentBrush(),
                                                     shape = RoundedCornerShape(16.dp),
                                                 )
                                                 .padding(14.dp),
@@ -859,7 +861,7 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                             .clip(CircleShape)
                             .background(
                                 if (canSend) {
-                                    Brush.linearGradient(themePalette.accentGradient)
+                                    themePalette.accentBrush()
                                 } else {
                                     SolidColor(MaterialTheme.nuvio.colors.surfaceCard.copy(alpha = 0.5f))
                                 }

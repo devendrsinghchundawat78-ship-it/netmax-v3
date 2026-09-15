@@ -32,6 +32,7 @@ import nuvio.composeapp.generated.resources.compose_settings_page_supporters_con
 import nuvio.composeapp.generated.resources.compose_settings_page_tmdb_enrichment
 import nuvio.composeapp.generated.resources.compose_settings_page_trakt
 import nuvio.composeapp.generated.resources.compose_settings_page_tracking
+import nuvio.composeapp.generated.resources.compose_nav_music
 import nuvio.composeapp.generated.resources.compose_nav_quick_watch
 import nuvio.composeapp.generated.resources.settings_account
 import org.jetbrains.compose.resources.StringResource
@@ -63,6 +64,11 @@ internal enum class SettingsPage(
     ),
     QuickWatch(
         titleRes = Res.string.compose_nav_quick_watch,
+        category = SettingsCategory.General,
+        parentPage = Root,
+    ),
+    Music(
+        titleRes = Res.string.compose_nav_music,
         category = SettingsCategory.General,
         parentPage = Root,
     ),

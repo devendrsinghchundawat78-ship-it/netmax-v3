@@ -14,6 +14,8 @@ internal object PluginStorage {
     fun initialize(context: Context) {
         preferences = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
         scraperCodeStore = PluginScraperCodeFileStore(context.filesDir.resolve(scraperCodeDirectoryName))
+        val targetDir = context.codeCacheDir ?: context.cacheDir
+        com.nuvio.app.features.plugins.runtime.cs3.CloudstreamPluginLoader.init(targetDir, context.applicationContext)
     }
 
     fun loadState(profileId: Int): String? =

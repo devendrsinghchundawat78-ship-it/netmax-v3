@@ -58,7 +58,7 @@ import org.jetbrains.compose.resources.painterResource
 import kotlin.random.Random
 
 object NetmaxIntroState {
-    var hasPlayedIntro: Boolean = false
+    var hasPlayedIntro: Boolean = true
 }
 
 private data class IntroParticle(

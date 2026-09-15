@@ -107,15 +107,17 @@ class HeroStretchState internal constructor(
     }
 
     private fun snapTo(value: Float) {
-        scope.launch { stretchAnim.snapTo(value.coerceIn(0f, maxStretchPx)) }
+        val safeValue = if (value.isNaN() || value.isInfinite()) 0f else value.coerceIn(0f, maxStretchPx)
+        scope.launch { stretchAnim.snapTo(safeValue) }
     }
 
     private fun settle(initialVelocity: Float, spec: SpringSpec<Float>) {
+        val safeVelocity = if (initialVelocity.isNaN() || initialVelocity.isInfinite()) 0f else initialVelocity
         settleJob = scope.launch {
             stretchAnim.animateTo(
                 targetValue = 0f,
                 animationSpec = spec,
-                initialVelocity = initialVelocity,
+                initialVelocity = safeVelocity,
             )
         }
     }
@@ -132,7 +134,10 @@ fun rememberHeroStretchState(listState: LazyListState): HeroStretchState {
 
 fun Modifier.heroStretchHeight(baseHeight: Dp, stretchPx: () -> Float): Modifier =
     layout { measurable, constraints ->
-        val height = baseHeight.roundToPx() + stretchPx().coerceAtLeast(0f).roundToInt()
+        val rawStretch = stretchPx()
+        val safeStretch = if (rawStretch.isNaN() || rawStretch.isInfinite()) 0f else rawStretch.coerceAtLeast(0f)
+        val desiredHeight = baseHeight.roundToPx() + safeStretch.roundToInt()
+        val height = desiredHeight.coerceIn(constraints.minHeight, constraints.maxHeight)
         val placeable = measurable.measure(
             constraints.copy(minHeight = height, maxHeight = height),
         )
@@ -140,7 +145,10 @@ fun Modifier.heroStretchHeight(baseHeight: Dp, stretchPx: () -> Float): Modifier
     }
 
 fun Modifier.heroStretchZoom(stretchPx: () -> Float): Modifier = graphicsLayer {
-    val zoom = 1f + stretchPx().coerceAtLeast(0f) / size.height.coerceAtLeast(1f)
+    val rawStretch = stretchPx()
+    val safeStretch = if (rawStretch.isNaN() || rawStretch.isInfinite()) 0f else rawStretch.coerceAtLeast(0f)
+    val layerHeight = size.height.takeIf { it > 0f && !it.isNaN() && !it.isInfinite() } ?: 1f
+    val zoom = (1f + safeStretch / layerHeight).coerceIn(1f, 3f)
     transformOrigin = TransformOrigin(0.5f, 0f)
     scaleX = zoom
     scaleY = zoom

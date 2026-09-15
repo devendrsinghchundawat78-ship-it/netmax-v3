@@ -359,7 +359,9 @@ internal fun Modifier.posterCardClickable(
     if (onClick == null && onLongClick == null) return this
     val bounds = remember { mutableStateOf<Rect?>(null) }
     return this
-        .onGloballyPositioned { coordinates -> bounds.value = coordinates.unclippedBoundsInRoot() }
+        .onGloballyPositioned { coordinates ->
+            coordinates.unclippedBoundsInRoot()?.let { bounds.value = it }
+        }
         .combinedClickable(
             onClick = { onClick?.invoke() },
             onLongClick = onLongClick?.let { longClick ->
@@ -379,12 +381,15 @@ internal fun Modifier.posterCardClickable(
         )
 }
 
-private fun androidx.compose.ui.layout.LayoutCoordinates.unclippedBoundsInRoot(): Rect {
-    val position = positionInRoot()
-    return Rect(
-        left = position.x,
-        top = position.y,
-        right = position.x + size.width,
-        bottom = position.y + size.height,
-    )
+private fun androidx.compose.ui.layout.LayoutCoordinates.unclippedBoundsInRoot(): Rect? {
+    if (!isAttached) return null
+    return runCatching {
+        val position = positionInRoot()
+        Rect(
+            left = position.x,
+            top = position.y,
+            right = position.x + size.width,
+            bottom = position.y + size.height,
+        )
+    }.getOrNull()
 }
