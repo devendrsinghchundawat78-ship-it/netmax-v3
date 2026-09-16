@@ -24,6 +24,7 @@ import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -142,8 +143,8 @@ private fun resolveInkColor(w: Float, alpha: Float, isDark: Boolean, tint: Color
     }
 }
 
-private fun radiusScale(size: Float, pow: Float = 0.6f): Float =
-    (size / 300f).toDouble().let { kotlin.math.pow(it, pow.toDouble()).toFloat() }
+private fun radiusScale(size: Float, exponent: Float = 0.6f): Float =
+    (size / 300f).toDouble().pow(exponent.toDouble()).toFloat()
 
 private fun hashD(a: Float, b: Float): Float {
     val h = sin(a * 12.9898f + b * 78.233f) * 43758.5453f
