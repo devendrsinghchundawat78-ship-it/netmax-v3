@@ -575,6 +575,7 @@ fun MusicFullPlayerSheet(
         }
     }
 }
+}
 
 @Composable
 private fun QueueListSection(
