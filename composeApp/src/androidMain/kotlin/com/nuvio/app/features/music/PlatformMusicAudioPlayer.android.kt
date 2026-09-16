@@ -81,6 +81,10 @@ internal actual class PlatformMusicAudioPlayer actual constructor() {
                         onErrorCallback?.invoke(error.message ?: "Playback error")
                     }
                 })
+            }.also { player ->
+                try {
+                    com.nuvio.app.features.equalizer.PlatformAudioEqualizer.attachAudioSession(player.audioSessionId)
+                } catch (_: Throwable) {}
             }
     }
 
@@ -114,7 +118,12 @@ internal actual class PlatformMusicAudioPlayer actual constructor() {
 
     actual fun release() {
         stopProgressPolling()
-        exoPlayer?.release()
+        exoPlayer?.let { player ->
+            try {
+                com.nuvio.app.features.equalizer.PlatformAudioEqualizer.detachAudioSession(player.audioSessionId)
+            } catch (_: Throwable) {}
+            player.release()
+        }
         exoPlayer = null
     }
 

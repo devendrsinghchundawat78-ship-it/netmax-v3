@@ -1,20 +1,26 @@
 package com.nuvio.app.core.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,22 +28,31 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +63,8 @@ import dev.chrisbanes.haze.hazeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.settings.LiquidGlassSettingsRepository
 import com.nuvio.app.features.settings.ThemeSettingsRepository
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -121,10 +138,15 @@ fun NuvioNavigationBar(
     modifier: Modifier = Modifier,
     scrollState: NuvioNavBarScrollState? = null,
     hazeState: HazeState? = null,
+    selectedTabIndex: Int = -1,
+    tabsCount: Int = 0,
+    onTabSelected: ((Int) -> Unit)? = null,
     onSwipeLeft: (() -> Unit)? = null,
     onSwipeRight: (() -> Unit)? = null,
     content: @Composable NuvioNavigationBarScope.() -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val liquidGlassEnabled by ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.collectAsStateWithLifecycle()
 
     val labelFraction by animateFloatAsState(
@@ -144,23 +166,130 @@ fun NuvioNavigationBar(
     val collapsedHorizontalPadding = 48.dp
     val horizontalPadding = expandedHorizontalPadding + (collapsedHorizontalPadding - expandedHorizontalPadding) * (1f - labelFraction)
 
+    val actualTabsCount = tabsCount.coerceAtLeast(1)
+    val hasSlidingPuck = tabsCount > 0 && selectedTabIndex >= 0
+    val animatedTabIndex = remember { Animatable(if (selectedTabIndex >= 0) selectedTabIndex.toFloat() else 0f) }
+    var isDragging by remember { mutableStateOf(false) }
+    val dragStartTab = remember { mutableIntStateOf(0) }
+    val dragAccumulated = remember { mutableFloatStateOf(0f) }
+    var tabWidthPx by remember { mutableFloatStateOf(0f) }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(selectedTabIndex) {
+        if (!isDragging && selectedTabIndex in 0 until actualTabsCount) {
+            animatedTabIndex.animateTo(
+                targetValue = selectedTabIndex.toFloat(),
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
+            )
+        }
+    }
+
+    val puckScaleX by animateFloatAsState(
+        targetValue = if (isDragging) 1.08f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow,
+        ),
+        label = "nav_puck_scale_x",
+    )
+    val puckScaleY by animateFloatAsState(
+        targetValue = if (isDragging) 0.94f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow,
+        ),
+        label = "nav_puck_scale_y",
+    )
+
+    val dragModifier = if (tabsCount > 0 && onTabSelected != null) {
+        Modifier.pointerInput(actualTabsCount, onTabSelected, tabWidthPx) {
+            detectHorizontalDragGestures(
+                onDragStart = {
+                    isDragging = true
+                    dragAccumulated.floatValue = 0f
+                    dragStartTab.intValue = animatedTabIndex.value.roundToInt().coerceIn(0, actualTabsCount - 1)
+                },
+                onHorizontalDrag = { change, dragAmount ->
+                    change.consume()
+                    dragAccumulated.floatValue += dragAmount
+                    if (tabWidthPx > 0f) {
+                        val nextPos = (animatedTabIndex.value + dragAmount / tabWidthPx)
+                            .coerceIn(0f, (actualTabsCount - 1).toFloat())
+                        coroutineScope.launch {
+                            animatedTabIndex.snapTo(nextPos)
+                        }
+                    }
+                },
+                onDragEnd = {
+                    isDragging = false
+                    val startIdx = dragStartTab.intValue
+                    val currentVal = animatedTabIndex.value
+                    var targetIdx = currentVal.roundToInt().coerceIn(0, actualTabsCount - 1)
+                    if (targetIdx == startIdx) {
+                        if (dragAccumulated.floatValue > 36f && startIdx < actualTabsCount - 1) {
+                            targetIdx = startIdx + 1
+                        } else if (dragAccumulated.floatValue < -36f && startIdx > 0) {
+                            targetIdx = startIdx - 1
+                        }
+                    }
+                    coroutineScope.launch {
+                        animatedTabIndex.animateTo(
+                            targetValue = targetIdx.toFloat(),
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow,
+                            ),
+                        )
+                        if (targetIdx != selectedTabIndex) {
+                            onTabSelected(targetIdx)
+                        }
+                    }
+                    dragAccumulated.floatValue = 0f
+                },
+                onDragCancel = {
+                    isDragging = false
+                    coroutineScope.launch {
+                        val safeTarget = if (selectedTabIndex in 0 until actualTabsCount) selectedTabIndex.toFloat() else 0f
+                        animatedTabIndex.animateTo(
+                            targetValue = safeTarget,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow,
+                            ),
+                        )
+                    }
+                    dragAccumulated.floatValue = 0f
+                },
+            )
+        }
+    } else {
+        Modifier
+    }
+
     // Outer container — no background, just safe padding
     Box(
         modifier = modifier
-            .pointerInput(onSwipeLeft, onSwipeRight) {
-                var dragDistance = 0f
-                detectHorizontalDragGestures(
-                    onHorizontalDrag = { _, dragAmount -> dragDistance += dragAmount },
-                    onDragEnd = {
-                        when {
-                            dragDistance <= -72f -> onSwipeLeft?.invoke()
-                            dragDistance >= 72f -> onSwipeRight?.invoke()
-                        }
-                        dragDistance = 0f
-                    },
-                    onDragCancel = { dragDistance = 0f },
-                )
-            }
+            .then(
+                if (tabsCount <= 0) {
+                    Modifier.pointerInput(onSwipeLeft, onSwipeRight) {
+                        var dragDistance = 0f
+                        detectHorizontalDragGestures(
+                            onHorizontalDrag = { _, dragAmount -> dragDistance += dragAmount },
+                            onDragEnd = {
+                                when {
+                                    dragDistance <= -72f -> onSwipeLeft?.invoke()
+                                    dragDistance >= 72f -> onSwipeRight?.invoke()
+                                }
+                                dragDistance = 0f
+                            },
+                            onDragCancel = { dragDistance = 0f },
+                        )
+                    }
+                } else Modifier
+            )
             .fillMaxWidth()
             .padding(bottom = bottomSafePadding + nuvioBottomNavigationExtraVerticalPadding + NuvioTokens.Space.s8),
         contentAlignment = Alignment.BottomCenter,
@@ -176,7 +305,97 @@ fun NuvioNavigationBar(
                 borderWidth = 1.2.dp,
             )
 
-        Box(modifier = pillModifier) {
+        BoxWithConstraints(
+            modifier = pillModifier.then(dragModifier),
+        ) {
+            val pillWidth = maxWidth
+            val innerHorizontalPad = NuvioTokens.Space.s6
+            val innerVerticalPad = NuvioTokens.Space.s4
+            val availableWidth = (pillWidth - (innerHorizontalPad * 2)).coerceAtLeast(0.dp)
+            val tabWidth = if (tabsCount > 0) availableWidth / actualTabsCount else 0.dp
+            val density = LocalDensity.current
+            LaunchedEffect(tabWidth, density) {
+                tabWidthPx = with(density) { tabWidth.toPx() }
+            }
+
+            if (hasSlidingPuck && tabWidth > 0.dp) {
+                val puckShape = RoundedCornerShape(NuvioTokens.Radius.full)
+                val glassBackground = if (isLight) {
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = if (isDragging) 0.55f else 0.42f),
+                            tokens.colors.accent.copy(alpha = if (isDragging) 0.28f else 0.18f),
+                            Color.White.copy(alpha = if (isDragging) 0.32f else 0.24f),
+                        ),
+                    )
+                } else {
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = if (isDragging) 0.18f else 0.12f),
+                            tokens.colors.accent.copy(alpha = if (isDragging) 0.32f else 0.22f),
+                            Color(0xFF1E1E28).copy(alpha = if (isDragging) 0.42f else 0.32f),
+                        ),
+                    )
+                }
+                val glassBorder = Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = if (isDragging) 0.70f else 0.50f),
+                        tokens.colors.accent.copy(alpha = if (isDragging) 0.50f else 0.35f),
+                        Color.White.copy(alpha = 0.12f),
+                    ),
+                )
+
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .padding(
+                            start = innerHorizontalPad + 2.dp,
+                            top = innerVerticalPad + 2.dp,
+                            bottom = innerVerticalPad + 2.dp,
+                        ),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width((tabWidth - 4.dp).coerceAtLeast(0.dp))
+                            .fillMaxHeight()
+                            .graphicsLayer {
+                                translationX = (tabWidth * animatedTabIndex.value).toPx()
+                                scaleX = puckScaleX
+                                scaleY = puckScaleY
+                            }
+                            .shadow(
+                                elevation = if (isDragging) 8.dp else 3.dp,
+                                shape = puckShape,
+                                spotColor = tokens.colors.accent.copy(alpha = 0.40f),
+                                ambientColor = tokens.colors.accent.copy(alpha = 0.20f),
+                            )
+                            .clip(puckShape)
+                            .background(glassBackground)
+                            .border(
+                                width = 1.dp,
+                                brush = glassBorder,
+                                shape = puckShape,
+                            ),
+                    ) {
+                        // Top specular liquid glass reflection
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(12.dp)
+                                .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color.White.copy(alpha = if (isDragging) 0.35f else 0.22f),
+                                            Color.Transparent,
+                                        ),
+                                    ),
+                                ),
+                        )
+                    }
+                }
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -190,6 +409,7 @@ fun NuvioNavigationBar(
                 NuvioNavigationBarScopeImpl(
                     rowScope = this,
                     labelFraction = labelFraction,
+                    hasSlidingPuck = hasSlidingPuck,
                 ).content()
             }
         }
@@ -230,6 +450,7 @@ interface NuvioNavigationBarScope {
 private class NuvioNavigationBarScopeImpl(
     private val rowScope: androidx.compose.foundation.layout.RowScope,
     private val labelFraction: Float,
+    private val hasSlidingPuck: Boolean = false,
 ) : NuvioNavigationBarScope {
 
     @Composable
@@ -250,9 +471,9 @@ private class NuvioNavigationBarScopeImpl(
             targetValue = if (selected) tokens.colors.accent else tokens.colors.textMuted,
             label = "nav_icon_color",
         )
-        // Selected item gets a pill-shaped highlight using accent at low opacity
+        // Selected item gets a pill-shaped highlight using accent at low opacity (suppressed if sliding puck active)
         val selectedBgColor by animateColorAsState(
-            targetValue = if (selected) tokens.colors.accent.copy(alpha = NuvioTokens.Opacity.selected)
+            targetValue = if (selected && !hasSlidingPuck) tokens.colors.accent.copy(alpha = NuvioTokens.Opacity.selected)
             else Color.Transparent,
             label = "nav_bg_color",
         )
@@ -304,7 +525,7 @@ private class NuvioNavigationBarScopeImpl(
             label = "nav_icon_color",
         )
         val selectedBgColor by animateColorAsState(
-            targetValue = if (selected) tokens.colors.accent.copy(alpha = NuvioTokens.Opacity.selected)
+            targetValue = if (selected && !hasSlidingPuck) tokens.colors.accent.copy(alpha = NuvioTokens.Opacity.selected)
             else Color.Transparent,
             label = "nav_bg_color",
         )
@@ -350,7 +571,7 @@ private class NuvioNavigationBarScopeImpl(
         val glassSettings by LiquidGlassSettingsRepository.uiState.collectAsStateWithLifecycle()
         val glassTextColor = if (glassSettings.enabled) glassSettings.textColor else tokens.colors.textMuted
         val selectedBgColor by animateColorAsState(
-            targetValue = if (selected) tokens.colors.accent.copy(alpha = NuvioTokens.Opacity.selected)
+            targetValue = if (selected && !hasSlidingPuck) tokens.colors.accent.copy(alpha = NuvioTokens.Opacity.selected)
             else Color.Transparent,
             label = "nav_bg_color",
         )

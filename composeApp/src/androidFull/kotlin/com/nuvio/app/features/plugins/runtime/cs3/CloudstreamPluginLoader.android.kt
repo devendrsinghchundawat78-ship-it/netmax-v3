@@ -112,12 +112,15 @@ object CloudstreamPluginLoader {
             if (pluginClassName != null) {
                 runCatching {
                     val cls = classLoader.loadClass(pluginClassName)
-                    if (BasePlugin::class.java.isAssignableFrom(cls)) {
-                        val pluginInstance = cls.getDeclaredConstructor().newInstance() as BasePlugin
+                    val pluginInstance = instantiate(cls, BasePlugin::class.java)
+                    if (pluginInstance != null) {
                         invokePluginLoad(cls, pluginInstance)
                         api = findMatchingApi(pluginInstance.registeredApis, scraperId)
-                    } else if (MainAPI::class.java.isAssignableFrom(cls)) {
-                        api = cls.getDeclaredConstructor().newInstance() as MainAPI
+                    } else {
+                        val mainApiInstance = instantiate(cls, MainAPI::class.java)
+                        if (mainApiInstance != null) {
+                            api = mainApiInstance
+                        }
                     }
                 }.onFailure { log.w(it) { "Failed to instantiate plugin class from manifest: $pluginClassName" } }
             }
@@ -130,23 +133,20 @@ object CloudstreamPluginLoader {
                     val entries = dexFile.entries()
                     while (entries.hasMoreElements() && api == null) {
                         val className = entries.nextElement()
-                        if (className.endsWith("Plugin") || !className.contains("$")) {
+                        if (className.endsWith("Plugin") || className.endsWith("Provider") || !className.contains("$")) {
                             runCatching {
                                 val cls = classLoader.loadClass(className)
-                                if (BasePlugin::class.java.isAssignableFrom(cls) &&
-                                    !cls.isInterface &&
-                                    !Modifier.isAbstract(cls.modifiers)
-                                ) {
-                                    val instance = cls.getDeclaredConstructor().newInstance() as BasePlugin
-                                    invokePluginLoad(cls, instance)
-                                    if (instance.registeredApis.isNotEmpty()) {
-                                        api = findMatchingApi(instance.registeredApis, scraperId)
+                                val pluginInstance = instantiate(cls, BasePlugin::class.java)
+                                if (pluginInstance != null) {
+                                    invokePluginLoad(cls, pluginInstance)
+                                    if (pluginInstance.registeredApis.isNotEmpty()) {
+                                        api = findMatchingApi(pluginInstance.registeredApis, scraperId)
                                     }
-                                } else if (MainAPI::class.java.isAssignableFrom(cls) &&
-                                    !cls.isInterface &&
-                                    !Modifier.isAbstract(cls.modifiers)
-                                ) {
-                                    api = cls.getDeclaredConstructor().newInstance() as MainAPI
+                                } else {
+                                    val mainApiInstance = instantiate(cls, MainAPI::class.java)
+                                    if (mainApiInstance != null) {
+                                        api = mainApiInstance
+                                    }
                                 }
                             }
                         }
@@ -166,6 +166,33 @@ object CloudstreamPluginLoader {
             log.e(e) { "Failed to load CloudStream plugin $scraperId" }
             return null
         }
+    }
+
+    private fun <T : Any> instantiate(cls: Class<*>, expectedType: Class<T>): T? {
+        if (!expectedType.isAssignableFrom(cls) || cls.isInterface || Modifier.isAbstract(cls.modifiers)) {
+            return null
+        }
+        // 1. Try Kotlin object singleton INSTANCE field
+        runCatching {
+            val field = cls.getDeclaredField("INSTANCE")
+            field.isAccessible = true
+            val obj = field.get(null)
+            if (expectedType.isInstance(obj)) {
+                @Suppress("UNCHECKED_CAST")
+                return obj as T
+            }
+        }
+        // 2. Try zero-arg constructor (make accessible in case it is internal or private)
+        runCatching {
+            val ctor = cls.getDeclaredConstructor()
+            ctor.isAccessible = true
+            val obj = ctor.newInstance()
+            if (expectedType.isInstance(obj)) {
+                @Suppress("UNCHECKED_CAST")
+                return obj as T
+            }
+        }
+        return null
     }
 
     private fun findMatchingApi(apis: List<MainAPI>, scraperId: String): MainAPI? {
@@ -192,12 +219,14 @@ object CloudstreamPluginLoader {
             error("Unable to create plugin cache dir: ${parent.absolutePath}")
         }
         if (pluginFile.exists()) {
+            runCatching { pluginFile.setWritable(true) }
             pluginFile.delete()
         }
         val tmp = File(parent, "${pluginFile.name}.tmp")
         if (tmp.exists()) tmp.delete()
         tmp.writeBytes(cs3Data)
         if (!tmp.renameTo(pluginFile)) {
+            runCatching { pluginFile.setWritable(true) }
             runCatching { pluginFile.writeBytes(cs3Data) }.getOrThrow()
         }
         runCatching { if (tmp.exists()) tmp.delete() }

@@ -56,11 +56,16 @@ internal object PluginManifestParser {
             val version = obj["version"]?.jsonPrimitive?.contentOrNull ?: "1"
             val iconUrl = obj["iconUrl"]?.jsonPrimitive?.contentOrNull
 
-            val tvTypes = (obj["tvTypes"] as? JsonArray)?.mapNotNull {
-                it.jsonPrimitive.contentOrNull
-            } ?: listOf("Movie", "TvSeries")
+            val rawTvTypes = (obj["tvTypes"] as? JsonArray)?.mapNotNull {
+                it.jsonPrimitive.contentOrNull?.trim()
+            }?.filter { it.isNotBlank() }
 
-            val supportedTypes = tvTypes.map { mapCloudStreamTvType(it) }.distinct()
+            val supportedTypes = if (rawTvTypes.isNullOrEmpty()) {
+                listOf("movie", "tv", "anime")
+            } else {
+                val mapped = rawTvTypes.flatMap { mapCloudStreamTvType(it) }.distinct()
+                if (mapped.isEmpty()) listOf("movie", "tv", "anime") else mapped
+            }
 
             PluginManifestScraper(
                 id = internalName,
@@ -93,9 +98,13 @@ internal object PluginManifestParser {
         )
     }
 
-    private fun mapCloudStreamTvType(tvType: String): String = when (tvType.lowercase()) {
-        "movie", "animemovie" -> "movie"
-        "tvseries", "anime", "ova", "cartoon", "asiandrama", "documentary" -> "tv"
-        else -> "movie"
+    private fun mapCloudStreamTvType(tvType: String): List<String> = when (tvType.trim().lowercase()) {
+        "movie" -> listOf("movie")
+        "animemovie" -> listOf("movie", "anime")
+        "tvseries" -> listOf("tv")
+        "anime" -> listOf("anime", "tv", "movie")
+        "ova", "cartoon", "asiandrama", "documentary" -> listOf("tv")
+        "others", "other", "live", "torrent" -> listOf("movie", "tv", "anime")
+        else -> listOf("movie", "tv")
     }
 }

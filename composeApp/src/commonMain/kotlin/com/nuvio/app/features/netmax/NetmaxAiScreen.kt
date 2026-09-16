@@ -80,6 +80,12 @@ import com.nuvio.app.core.ui.ThemeColors
 import com.nuvio.app.core.ui.accentBrush
 import com.nuvio.app.core.ui.liquidGlass
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.features.netmax.components.BorderBeamCard
+import com.nuvio.app.features.netmax.components.BorderBeamVariant
+import com.nuvio.app.features.netmax.components.LiquidMetalPill
+import com.nuvio.app.features.netmax.components.LiquidMetalRing
+import com.nuvio.app.features.netmax.components.OrbState
+import com.nuvio.app.features.netmax.components.ThinkingOrb
 import com.nuvio.app.features.settings.ThemeSettingsRepository
 import kotlinx.coroutines.launch
 
@@ -195,31 +201,17 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     iconSize = 20.dp,
                 )
 
-                // AI Avatar Icon Badge
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    themePalette.secondary.copy(alpha = 0.25f),
-                                    themePalette.secondaryVariant.copy(alpha = 0.15f),
-                                )
-                            )
-                        )
-                        .border(
-                            width = 1.dp,
-                            brush = themePalette.accentBrush(),
-                            shape = CircleShape,
-                        ),
-                    contentAlignment = Alignment.Center,
+                // AI Avatar with libraries.dev ThinkingOrb and LiquidMetalRing
+                LiquidMetalRing(
+                    size = 36.dp,
+                    ringWidth = 1.2.dp,
+                    accentColor = themePalette.secondary,
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.AutoAwesome,
-                        contentDescription = null,
+                    ThinkingOrb(
+                        state = if (busy) OrbState.Working else OrbState.Breathing,
+                        size = 32.dp,
+                        speed = if (busy) 1.5f else 1f,
                         tint = themePalette.secondary,
-                        modifier = Modifier.size(18.dp),
                     )
                 }
 
@@ -244,26 +236,16 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     )
                 }
 
-                // Daily Limit Pill Badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (remaining > 3) themePalette.secondary.copy(alpha = 0.15f)
-                            else MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = if (remaining > 3) themePalette.secondary.copy(alpha = 0.4f)
-                            else MaterialTheme.colorScheme.error.copy(alpha = 0.4f),
-                            shape = RoundedCornerShape(12.dp),
-                        )
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                // Daily Limit Pill Badge with libraries.dev LiquidMetal
+                LiquidMetalPill(
+                    shape = RoundedCornerShape(12.dp),
+                    accentColor = if (remaining > 3) themePalette.secondary else MaterialTheme.colorScheme.error,
                 ) {
                     Text(
                         text = "⚡ $remaining left",
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                         color = if (remaining > 3) themePalette.secondary else MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     )
                 }
 
@@ -313,18 +295,14 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(themePalette.secondary.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center,
+                    LiquidMetalRing(
+                        size = 56.dp,
+                        accentColor = themePalette.secondary,
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.AutoAwesome,
-                            contentDescription = null,
+                        ThinkingOrb(
+                            state = OrbState.Breathing,
+                            size = 48.dp,
                             tint = themePalette.secondary,
-                            modifier = Modifier.size(28.dp),
                         )
                     }
                     Text(
@@ -333,7 +311,7 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         color = MaterialTheme.nuvio.colors.textPrimary,
                     )
                     Text(
-                        text = "NetMax AI ka use karne ke liye pehle apne email account se sign in karein.",
+                        text = "NetMax AI Assistant ka use karne ke liye pehle apne email account se sign in karein.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.nuvio.colors.textSecondary,
                         textAlign = TextAlign.Center,
@@ -352,42 +330,17 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        // Glowing Emblem
-                        val infiniteTransition = rememberInfiniteTransition()
-                        val pulseScale by infiniteTransition.animateFloat(
-                            initialValue = 0.95f,
-                            targetValue = 1.05f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(1500),
-                                repeatMode = RepeatMode.Reverse,
-                            ),
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .scale(pulseScale)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.radialGradient(
-                                        listOf(
-                                            themePalette.secondary.copy(alpha = 0.35f),
-                                            Color.Transparent,
-                                        )
-                                    )
-                                )
-                                .border(
-                                    width = 1.5.dp,
-                                    brush = themePalette.accentBrush(),
-                                    shape = CircleShape,
-                                ),
-                            contentAlignment = Alignment.Center,
+                        // Glowing Emblem with libraries.dev ThinkingOrb and LiquidMetalRing
+                        LiquidMetalRing(
+                            size = 84.dp,
+                            ringWidth = 2.dp,
+                            accentColor = themePalette.secondary,
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.AutoAwesome,
-                                contentDescription = null,
+                            ThinkingOrb(
+                                state = OrbState.Shaping,
+                                size = 76.dp,
+                                speed = 1.1f,
                                 tint = themePalette.secondary,
-                                modifier = Modifier.size(34.dp),
                             )
                         }
 
@@ -435,24 +388,18 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                             )
 
                             suggestions.forEach { suggestion ->
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(themePalette.backgroundCard.copy(alpha = 0.8f))
-                                        .border(
-                                            width = 1.dp,
-                                            color = MaterialTheme.nuvio.colors.borderSubtle,
-                                            shape = RoundedCornerShape(16.dp),
-                                        )
-                                        .clickable {
-                                            sendMessage(suggestion.substringAfter(" "))
-                                        }
-                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                LiquidMetalPill(
+                                    shape = RoundedCornerShape(16.dp),
+                                    accentColor = themePalette.secondary.copy(alpha = 0.5f),
+                                    onClick = {
+                                        sendMessage(suggestion.substringAfter(" "))
+                                    },
                                 ) {
                                     Text(
                                         text = suggestion,
                                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
                                         color = MaterialTheme.nuvio.colors.textSecondary,
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                                     )
                                 }
                             }
@@ -475,20 +422,16 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                             ) {
                                 if (!isUser) {
                                     // Assistant Avatar
-                                    Box(
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .clip(CircleShape)
-                                            .background(themePalette.secondary.copy(alpha = 0.2f))
-                                            .border(1.dp, themePalette.secondary.copy(alpha = 0.5f), CircleShape)
-                                            .padding(4.dp),
-                                        contentAlignment = Alignment.Center,
+                                    // Assistant Avatar with libraries.dev ThinkingOrb
+                                    LiquidMetalRing(
+                                        size = 28.dp,
+                                        ringWidth = 1.2.dp,
+                                        accentColor = themePalette.secondary,
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.AutoAwesome,
-                                            contentDescription = null,
+                                        ThinkingOrb(
+                                            state = OrbState.Breathing,
+                                            size = 24.dp,
                                             tint = themePalette.secondary,
-                                            modifier = Modifier.size(16.dp),
                                         )
                                     }
                                     Spacer(Modifier.width(8.dp))
@@ -556,131 +499,137 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                                     }
 
                                     // Action Proposal Card (if any)
-                                    msg.action?.let { action ->
-                                        Spacer(Modifier.height(8.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(16.dp))
-                                                .background(themePalette.backgroundElevated)
-                                                .border(
-                                                    width = 1.dp,
-                                                    brush = themePalette.accentBrush(),
-                                                    shape = RoundedCornerShape(16.dp),
-                                                )
-                                                .padding(14.dp),
-                                        ) {
-                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Rounded.Movie,
-                                                        contentDescription = null,
-                                                        tint = themePalette.secondary,
-                                                        modifier = Modifier.size(16.dp),
-                                                    )
-                                                    Text(
-                                                        text = action.type.replace('_', ' ').uppercase(),
-                                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                                        color = themePalette.secondary,
-                                                    )
-                                                }
+                                     // Action Proposal Card (if any) with libraries.dev BorderBeam
+                                     msg.action?.let { action ->
+                                         Spacer(Modifier.height(8.dp))
+                                         BorderBeamCard(
+                                             variant = BorderBeamVariant.Colorful,
+                                             shape = RoundedCornerShape(16.dp),
+                                             durationMillis = 3500,
+                                             modifier = Modifier.fillMaxWidth(),
+                                         ) {
+                                             Box(
+                                                 modifier = Modifier
+                                                     .fillMaxWidth()
+                                                     .clip(RoundedCornerShape(16.dp))
+                                                     .background(themePalette.backgroundElevated)
+                                                     .padding(14.dp),
+                                             ) {
+                                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                     Row(
+                                                         verticalAlignment = Alignment.CenterVertically,
+                                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                     ) {
+                                                         Icon(
+                                                             imageVector = Icons.Rounded.Movie,
+                                                             contentDescription = null,
+                                                             tint = themePalette.secondary,
+                                                             modifier = Modifier.size(16.dp),
+                                                         )
+                                                         Text(
+                                                             text = action.type.replace('_', ' ').uppercase(),
+                                                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                             color = themePalette.secondary,
+                                                         )
+                                                     }
 
-                                                if (action.title.isNotBlank()) {
-                                                    Text(
-                                                        text = action.title,
-                                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                                                        color = MaterialTheme.nuvio.colors.textPrimary,
-                                                    )
-                                                }
+                                                     if (action.title.isNotBlank()) {
+                                                         Text(
+                                                             text = action.title,
+                                                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                                                             color = MaterialTheme.nuvio.colors.textPrimary,
+                                                         )
+                                                     }
 
-                                                if (action.description.isNotBlank()) {
-                                                    Text(
-                                                        text = action.description,
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.nuvio.colors.textSecondary,
-                                                    )
-                                                }
+                                                     if (action.description.isNotBlank()) {
+                                                         Text(
+                                                             text = action.description,
+                                                             style = MaterialTheme.typography.bodySmall,
+                                                             color = MaterialTheme.nuvio.colors.textSecondary,
+                                                         )
+                                                     }
 
-                                                // Submit button
-                                                val isThisSubmitting = submittingActionId == msg.id
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clip(RoundedCornerShape(12.dp))
-                                                        .background(
-                                                            if (msg.isSubmitted) MaterialTheme.nuvio.colors.surfaceCard
-                                                            else themePalette.secondary
-                                                        )
-                                                        .clickable(enabled = !msg.isSubmitted && !isThisSubmitting) {
-                                                            submittingActionId = msg.id
-                                                            scope.launch {
-                                                                runCatching {
-                                                                    NetmaxAiService.submit(action, conversationId)
-                                                                }.onSuccess { replyText ->
-                                                                    val idx = messages.indexOfFirst { it.id == msg.id }
-                                                                    if (idx != -1) {
-                                                                        messages[idx] = messages[idx].copy(isSubmitted = true)
-                                                                    }
-                                                                    messages.add(
-                                                                        ChatLine(
-                                                                            id = "action_res_${System.currentTimeMillis()}",
-                                                                            role = "assistant",
-                                                                            text = replyText,
-                                                                        )
-                                                                    )
-                                                                }.onFailure { err ->
-                                                                    error = err.message
-                                                                }
-                                                                submittingActionId = null
-                                                            }
-                                                        }
-                                                        .padding(vertical = 10.dp),
-                                                    contentAlignment = Alignment.Center,
-                                                ) {
-                                                    if (isThisSubmitting) {
-                                                        CircularProgressIndicator(
-                                                            modifier = Modifier.size(16.dp),
-                                                            color = Color.White,
-                                                            strokeWidth = 2.dp,
-                                                        )
-                                                    } else {
-                                                        Row(
-                                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                        ) {
-                                                            if (msg.isSubmitted) {
-                                                                Icon(
-                                                                    imageVector = Icons.Rounded.Check,
-                                                                    contentDescription = null,
-                                                                    tint = MaterialTheme.nuvio.colors.success,
-                                                                    modifier = Modifier.size(16.dp),
-                                                                )
-                                                                Text(
-                                                                    text = "Submitted",
-                                                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                                                    color = MaterialTheme.nuvio.colors.textSecondary,
-                                                                )
-                                                            } else {
-                                                                Text(
-                                                                    text = "Submit Request",
-                                                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                                                    color = themePalette.onSecondary,
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
+                                                     // Submit button with LiquidMetal
+                                                     val isThisSubmitting = submittingActionId == msg.id
+                                                     LiquidMetalPill(
+                                                         modifier = Modifier.fillMaxWidth(),
+                                                         shape = RoundedCornerShape(12.dp),
+                                                         accentColor = if (msg.isSubmitted) null else themePalette.secondary,
+                                                         onClick = if (!msg.isSubmitted && !isThisSubmitting) {
+                                                             {
+                                                                 submittingActionId = msg.id
+                                                                 scope.launch {
+                                                                     runCatching {
+                                                                         NetmaxAiService.submit(action, conversationId)
+                                                                     }.onSuccess { replyText ->
+                                                                         val idx = messages.indexOfFirst { it.id == msg.id }
+                                                                         if (idx != -1) {
+                                                                             messages[idx] = messages[idx].copy(isSubmitted = true)
+                                                                         }
+                                                                         messages.add(
+                                                                             ChatLine(
+                                                                                 id = "action_res_${System.currentTimeMillis()}",
+                                                                                 role = "assistant",
+                                                                                 text = replyText,
+                                                                             )
+                                                                         )
+                                                                     }.onFailure { err ->
+                                                                         error = err.message
+                                                                     }
+                                                                     submittingActionId = null
+                                                                 }
+                                                             }
+                                                         } else null,
+                                                     ) {
+                                                         Box(
+                                                             modifier = Modifier
+                                                                 .fillMaxWidth()
+                                                                 .padding(vertical = 10.dp),
+                                                             contentAlignment = Alignment.Center,
+                                                         ) {
+                                                             if (isThisSubmitting) {
+                                                                 CircularProgressIndicator(
+                                                                     modifier = Modifier.size(16.dp),
+                                                                     color = Color.White,
+                                                                     strokeWidth = 2.dp,
+                                                                 )
+                                                             } else {
+                                                                 Row(
+                                                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                                     verticalAlignment = Alignment.CenterVertically,
+                                                                 ) {
+                                                                     if (msg.isSubmitted) {
+                                                                         Icon(
+                                                                             imageVector = Icons.Rounded.Check,
+                                                                             contentDescription = null,
+                                                                             tint = MaterialTheme.nuvio.colors.success,
+                                                                             modifier = Modifier.size(16.dp),
+                                                                         )
+                                                                         Text(
+                                                                             text = "Submitted",
+                                                                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                                                             color = MaterialTheme.nuvio.colors.textSecondary,
+                                                                         )
+                                                                     } else {
+                                                                         Text(
+                                                                             text = "Submit Request",
+                                                                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                                                             color = themePalette.onSecondary,
+                                                                         )
+                                                                     }
+                                                                 }
+                                                             }
+                                                         }
+                                                     }
+                                                 }
+                                             }
+                                         }
+                                     }
                                 }
                             }
                         }
 
-                        // Typing / Thinking Indicator
+                        // Typing / Thinking Indicator with libraries.dev ThinkingOrb and BorderBeam
                         if (busy) {
                             item {
                                 Row(
@@ -688,79 +637,59 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                                     horizontalArrangement = Arrangement.Start,
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .clip(CircleShape)
-                                            .background(themePalette.secondary.copy(alpha = 0.2f))
-                                            .border(1.dp, themePalette.secondary.copy(alpha = 0.5f), CircleShape)
-                                            .padding(4.dp),
-                                        contentAlignment = Alignment.Center,
+                                    LiquidMetalRing(
+                                        size = 28.dp,
+                                        ringWidth = 1.2.dp,
+                                        accentColor = themePalette.secondary,
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.AutoAwesome,
-                                            contentDescription = null,
+                                        ThinkingOrb(
+                                            state = OrbState.Searching,
+                                            size = 24.dp,
+                                            speed = 1.4f,
                                             tint = themePalette.secondary,
-                                            modifier = Modifier.size(16.dp),
                                         )
                                     }
                                     Spacer(Modifier.width(8.dp))
 
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(
-                                                RoundedCornerShape(
-                                                    topStart = 18.dp,
-                                                    topEnd = 18.dp,
-                                                    bottomStart = 4.dp,
-                                                    bottomEnd = 18.dp,
-                                                )
-                                            )
-                                            .background(themePalette.backgroundCard)
-                                            .border(
-                                                width = 1.dp,
-                                                color = MaterialTheme.nuvio.colors.borderSubtle,
-                                                shape = RoundedCornerShape(
-                                                    topStart = 18.dp,
-                                                    topEnd = 18.dp,
-                                                    bottomStart = 4.dp,
-                                                    bottomEnd = 18.dp,
-                                                ),
-                                            )
-                                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    BorderBeamCard(
+                                        variant = BorderBeamVariant.Assistant,
+                                        shape = RoundedCornerShape(
+                                            topStart = 18.dp,
+                                            topEnd = 18.dp,
+                                            bottomStart = 4.dp,
+                                            bottomEnd = 18.dp,
+                                        ),
+                                        durationMillis = 2200,
                                     ) {
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(
+                                                    RoundedCornerShape(
+                                                        topStart = 18.dp,
+                                                        topEnd = 18.dp,
+                                                        bottomStart = 4.dp,
+                                                        bottomEnd = 18.dp,
+                                                    )
+                                                )
+                                                .background(themePalette.backgroundCard)
+                                                .padding(horizontal = 14.dp, vertical = 10.dp),
                                         ) {
-                                            val infiniteTransition = rememberInfiniteTransition()
-                                            val dotAlpha by infiniteTransition.animateFloat(
-                                                initialValue = 0.3f,
-                                                targetValue = 1f,
-                                                animationSpec = infiniteRepeatable(
-                                                    animation = tween(600),
-                                                    repeatMode = RepeatMode.Reverse,
-                                                ),
-                                            )
-
-                                            Box(
-                                                Modifier.size(6.dp).clip(CircleShape)
-                                                    .background(themePalette.secondary.copy(alpha = dotAlpha))
-                                            )
-                                            Box(
-                                                Modifier.size(6.dp).clip(CircleShape)
-                                                    .background(themePalette.secondary.copy(alpha = (dotAlpha + 0.3f).coerceAtMost(1f)))
-                                            )
-                                            Box(
-                                                Modifier.size(6.dp).clip(CircleShape)
-                                                    .background(themePalette.secondary.copy(alpha = (dotAlpha + 0.6f).coerceAtMost(1f)))
-                                            )
-                                            Spacer(Modifier.width(4.dp))
-                                            Text(
-                                                text = "NetMax AI is thinking...",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.nuvio.colors.textMuted,
-                                            )
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                ThinkingOrb(
+                                                    state = OrbState.Working,
+                                                    size = 18.dp,
+                                                    speed = 1.6f,
+                                                    tint = themePalette.secondary,
+                                                )
+                                                Text(
+                                                    text = "NetMax AI Assistant is thinking...",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.nuvio.colors.textMuted,
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -807,79 +736,94 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 }
             }
 
-            // --- Bottom Input Bar ---
-            Box(
+            // --- Bottom Input Bar with libraries.dev BorderBeam ---
+            BorderBeamCard(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                    .liquidGlass(
-                        shape = RoundedCornerShape(26.dp),
-                        isEnabled = liquidGlassEnabled,
-                    )
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                variant = BorderBeamVariant.Assistant,
+                active = busy || input.isNotEmpty(),
+                shape = RoundedCornerShape(26.dp),
+                durationMillis = 2600,
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .liquidGlass(
+                            shape = RoundedCornerShape(26.dp),
+                            isEnabled = liquidGlassEnabled,
+                        )
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (input.isEmpty()) {
-                            Text(
-                                text = "Ask NetMax AI anything…",
-                                style = TextStyle(
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
+                            if (input.isEmpty()) {
+                                Text(
+                                    text = "Ask NetMax AI anything…",
+                                    style = TextStyle(
+                                        fontSize = 15.sp,
+                                        color = MaterialTheme.nuvio.colors.textMuted,
+                                    ),
+                                )
+                            }
+                            BasicTextField(
+                                value = input,
+                                onValueChange = {
+                                    input = it.take(4000)
+                                    error = null
+                                },
+                                textStyle = TextStyle(
                                     fontSize = 15.sp,
-                                    color = MaterialTheme.nuvio.colors.textMuted,
+                                    color = MaterialTheme.nuvio.colors.textPrimary,
                                 ),
+                                cursorBrush = SolidColor(themePalette.secondary),
+                                enabled = !busy,
+                                maxLines = 4,
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        BasicTextField(
-                            value = input,
-                            onValueChange = {
-                                input = it.take(4000)
-                                error = null
-                            },
-                            textStyle = TextStyle(
-                                fontSize = 15.sp,
-                                color = MaterialTheme.nuvio.colors.textPrimary,
-                            ),
-                            cursorBrush = SolidColor(themePalette.secondary),
-                            enabled = !busy,
-                            maxLines = 4,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
 
-                    // Send Button
-                    val canSend = input.isNotBlank() && !busy
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (canSend) {
-                                    themePalette.accentBrush()
-                                } else {
-                                    SolidColor(MaterialTheme.nuvio.colors.surfaceCard.copy(alpha = 0.5f))
-                                }
-                            )
-                            .clickable(
-                                enabled = canSend,
-                                indication = ripple(bounded = true, radius = 20.dp),
-                                interactionSource = remember { MutableInteractionSource() },
-                                onClick = { sendMessage(input) },
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Send,
-                            contentDescription = "Send",
-                            tint = if (canSend) themePalette.onSecondary else MaterialTheme.nuvio.colors.textMuted,
-                            modifier = Modifier.size(18.dp),
-                        )
+                        // Send Button with libraries.dev LiquidMetalRing
+                        val canSend = input.isNotBlank() && !busy
+                        LiquidMetalRing(
+                            size = 40.dp,
+                            ringWidth = 1.2.dp,
+                            accentColor = if (canSend) themePalette.secondary else null,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (canSend) {
+                                            themePalette.accentBrush()
+                                        } else {
+                                            SolidColor(MaterialTheme.nuvio.colors.surfaceCard.copy(alpha = 0.5f))
+                                        }
+                                    )
+                                    .clickable(
+                                        enabled = canSend,
+                                        indication = ripple(bounded = true, radius = 20.dp),
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        onClick = { sendMessage(input) },
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Send,
+                                    contentDescription = "Send",
+                                    tint = if (canSend) themePalette.onSecondary else MaterialTheme.nuvio.colors.textMuted,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }

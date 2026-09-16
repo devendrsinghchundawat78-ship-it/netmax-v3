@@ -37,4 +37,19 @@ internal actual object QuickWatchSettingsStorage {
         def.setBool(settings.autoMute, forKey = KEY_AUTO_MUTE)
         def.setBool(settings.showActionRail, forKey = KEY_SHOW_ACTION_RAIL)
     }
+
+    private const val KEY_SEEN_IDS = "quick_watch_seen_video_ids"
+
+    actual fun loadSeenVideoIds(): Set<String> {
+        val def = NSUserDefaults.standardUserDefaults
+        val raw = def.stringForKey(KEY_SEEN_IDS) ?: ""
+        if (raw.isBlank()) return emptySet()
+        return raw.split(",").map { it.trim() }.filter { it.isNotBlank() }.toSet()
+    }
+
+    actual fun saveSeenVideoIds(ids: Set<String>) {
+        val raw = ids.takeLast(200).joinToString(",")
+        val def = NSUserDefaults.standardUserDefaults
+        def.setObject(raw, forKey = KEY_SEEN_IDS)
+    }
 }

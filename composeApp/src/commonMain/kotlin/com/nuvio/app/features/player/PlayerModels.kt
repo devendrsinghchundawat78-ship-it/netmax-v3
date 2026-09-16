@@ -82,7 +82,7 @@ enum class VisualEnhancerMode(
 ) {
     Vivid(
         label = "Vivid",
-        description = "Balanced saturation boost and dynamic contrast for rich, vibrant picture (MX Player style).",
+        description = "Balanced saturation boost and dynamic contrast for rich, vibrant picture.",
     ),
     Cinema(
         label = "Cinema",

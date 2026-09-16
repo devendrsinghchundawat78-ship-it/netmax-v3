@@ -23,13 +23,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -89,6 +93,8 @@ fun MusicFullPlayerSheet(
     val downloadProg = track?.let { downloadsProgress[it.id] } ?: 0f
 
     var showQueue by remember { mutableStateOf(false) }
+    var showLyrics by remember { mutableStateOf(false) }
+    var showEqualizer by remember { mutableStateOf(false) }
     var isDraggingSlider by remember { mutableStateOf(false) }
     var dragPositionMs by remember { mutableFloatStateOf(0f) }
 
@@ -191,53 +197,82 @@ fun MusicFullPlayerSheet(
                         }
                     }
 
-                    if (showQueue) {
-                        // Queue View
-                        QueueListSection(
-                            state = state,
-                            onClose = { showQueue = false },
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(vertical = 16.dp),
-                        )
-                    } else {
-                        // Normal Full Player View
-                        Spacer(Modifier.height(24.dp))
-
-                        // Big Artwork Card
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Box(
+                    when {
+                        showQueue -> {
+                            // Queue View
+                            QueueListSection(
+                                state = state,
+                                onClose = { showQueue = false },
                                 modifier = Modifier
-                                    .fillMaxWidth(0.9f)
-                                    .aspectRatio(1f)
-                                    .shadow(28.dp, RoundedCornerShape(24.dp), clip = false)
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                                contentAlignment = Alignment.Center,
+                                    .weight(1f)
+                                    .padding(vertical = 16.dp),
+                            )
+                        }
+                        showEqualizer -> {
+                            // Equalizer View
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp)
+                                    .verticalScroll(rememberScrollState()),
                             ) {
-                                if (track.artworkUrl.isNotBlank()) {
-                                    AsyncImage(
-                                        model = track.displayArtworkUrl,
-                                        contentDescription = track.title,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Rounded.MusicNote,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(96.dp),
-                                    )
-                                }
+                                com.nuvio.app.features.equalizer.EqualizerPanel(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onDismiss = { showEqualizer = false },
+                                )
                             }
                         }
+                        else -> {
+                            // Normal Full Player View
+                            Spacer(Modifier.height(20.dp))
+
+                            if (showLyrics) {
+                                MusicLyricsView(
+                                    track = track,
+                                    currentPositionMs = if (isDraggingSlider) dragPositionMs.toLong() else state.currentPositionMs,
+                                    onClose = { showLyrics = false },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp),
+                                )
+                            } else {
+                                // Big Artwork Card
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.9f)
+                                            .aspectRatio(1f)
+                                            .shadow(28.dp, RoundedCornerShape(24.dp), clip = false)
+                                            .clip(RoundedCornerShape(24.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        if (track.artworkUrl.isNotBlank()) {
+                                            AsyncImage(
+                                                model = track.displayArtworkUrl,
+                                                contentDescription = track.title,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.fillMaxSize(),
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = Icons.Rounded.MusicNote,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                                modifier = Modifier.size(96.dp),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
 
                         Spacer(Modifier.height(28.dp))
 
@@ -442,15 +477,69 @@ fun MusicFullPlayerSheet(
 
                         Spacer(Modifier.height(18.dp))
 
-                        // Bottom Actions: Download button
+                        // Bottom Actions: Lyrics, Equalizer, Download
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
+                            horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            // Lyrics Toggle Button
+                            IconButton(
+                                onClick = {
+                                    showLyrics = !showLyrics
+                                    if (showLyrics) {
+                                        showEqualizer = false
+                                        showQueue = false
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (showLyrics) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                                    ),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Lyrics,
+                                    contentDescription = "Lyrics",
+                                    tint = if (showLyrics) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+
+                            // Equalizer Toggle Button
+                            IconButton(
+                                onClick = {
+                                    showEqualizer = !showEqualizer
+                                    if (showEqualizer) {
+                                        showLyrics = false
+                                        showQueue = false
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (showEqualizer) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                                    ),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.GraphicEq,
+                                    contentDescription = "Equalizer",
+                                    tint = if (showEqualizer) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+
+                            // Download button
                             IconButton(
                                 onClick = { MusicDownloadManager.downloadTrack(track) },
-                                modifier = Modifier.size(44.dp),
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
                             ) {
                                 when {
                                     isDownloading -> {

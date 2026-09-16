@@ -38,4 +38,20 @@ internal actual object QuickWatchSettingsStorage {
             ?.putBoolean(ProfileScopedKey.of(KEY_SHOW_ACTION_RAIL), settings.showActionRail)
             ?.apply()
     }
+
+    private const val KEY_SEEN_IDS = "quick_watch_seen_video_ids"
+
+    actual fun loadSeenVideoIds(): Set<String> {
+        val prefs = preferences ?: return emptySet()
+        val raw = prefs.getString(ProfileScopedKey.of(KEY_SEEN_IDS), "") ?: ""
+        if (raw.isBlank()) return emptySet()
+        return raw.split(",").map { it.trim() }.filter { it.isNotBlank() }.toSet()
+    }
+
+    actual fun saveSeenVideoIds(ids: Set<String>) {
+        val raw = ids.takeLast(200).joinToString(",")
+        preferences?.edit()
+            ?.putString(ProfileScopedKey.of(KEY_SEEN_IDS), raw)
+            ?.apply()
+    }
 }

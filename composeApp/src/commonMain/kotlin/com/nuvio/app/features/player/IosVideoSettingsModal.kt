@@ -98,12 +98,90 @@ internal fun IosVideoSettingsModal(
 
             Spacer(Modifier.height(16.dp))
 
+            var activeTab by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(0) }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (activeTab == 0) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable { activeTab = 0 }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.AutoAwesome,
+                            contentDescription = null,
+                            tint = if (activeTab == 0) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = "Visual Enhancer",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (activeTab == 0) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 12.sp,
+                            ),
+                            color = if (activeTab == 0) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (activeTab == 1) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable { activeTab = 1 }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Rounded.GraphicEq,
+                            contentDescription = null,
+                            tint = if (activeTab == 1) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = "Audio Equalizer",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (activeTab == 1) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 12.sp,
+                            ),
+                            color = if (activeTab == 1) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
+                if (activeTab == 1) {
+                    com.nuvio.app.features.equalizer.EqualizerPanel(
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
                 // Visual Enhancer Hero Section
                 Surface(
                     modifier = Modifier
@@ -171,9 +249,8 @@ internal fun IosVideoSettingsModal(
                                 )
                                 Text(
                                     text = stringResource(Res.string.player_visual_enhancer_desc),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                 )
                             }
 
@@ -263,6 +340,26 @@ internal fun IosVideoSettingsModal(
                                         )
                                     }
                                 }
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
+                                )
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                                        .clickable { activeTab = 1 }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Icon(androidx.compose.material.icons.Icons.Rounded.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                        Text("Audio Equalizer & Surround", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                    Text("Open →", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
+                                }
                             }
                         }
                     }
@@ -321,6 +418,7 @@ internal fun IosVideoSettingsModal(
                         },
                     )
                 }
+            }
             }
         }
     }

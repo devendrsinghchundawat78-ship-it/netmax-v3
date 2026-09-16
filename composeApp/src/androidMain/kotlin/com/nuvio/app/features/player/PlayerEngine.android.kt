@@ -438,6 +438,9 @@ private fun ExoPlayerSurface(
             hasActiveSubtitle = false,
             useCustomSubtitles = false,
         )
+        try {
+            com.nuvio.app.features.equalizer.PlatformAudioEqualizer.attachAudioSession(player.audioSessionId)
+        } catch (_: Throwable) {}
         player
     }
 
@@ -726,6 +729,9 @@ private fun ExoPlayerSurface(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             playerViewRef?.releaseLibassOverlay()
+            try {
+                com.nuvio.app.features.equalizer.PlatformAudioEqualizer.detachAudioSession(exoPlayer.audioSessionId)
+            } catch (_: Throwable) {}
             exoPlayer.release()
         }
     }

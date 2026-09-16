@@ -393,8 +393,11 @@ actual object PluginRepository {
     actual fun getEnabledScrapersForType(type: String): List<PluginScraper> {
         initialize()
         if (!_uiState.value.pluginsEnabled) return emptyList()
-        return _uiState.value.scrapers.filter { scraper ->
-            scraper.enabled && scraper.supportsType(type)
+        val enabledScrapers = _uiState.value.scrapers.filter { it.enabled }
+        val matchingScrapers = enabledScrapers.filter { it.supportsType(type) }
+        if (matchingScrapers.isNotEmpty()) return matchingScrapers
+        return enabledScrapers.filter { scraper ->
+            scraper.supportedTypes.isEmpty() || scraper.supportsType("movie") || scraper.supportsType("tv")
         }
     }
 
@@ -473,6 +476,7 @@ actual object PluginRepository {
     ): Pair<PluginRepositoryItem, List<PluginScraper>> {
         val storageProfileId = currentProfileId
         return withContext(Dispatchers.Default) {
+            var effectiveManifestUrl = manifestUrl
             var targetPayload = fetchTextWithMirrors(manifestUrl)
             if (targetPayload.contains("\"pluginLists\"")) {
                 runCatching {
@@ -482,12 +486,13 @@ actual object PluginRepository {
                     }
                     val targetUrl = list?.firstOrNull()
                     if (!targetUrl.isNullOrBlank()) {
+                        effectiveManifestUrl = targetUrl
                         targetPayload = fetchTextWithMirrors(targetUrl)
                     }
                 }
             }
             val manifest = PluginManifestParser.parse(targetPayload)
-            val baseUrls = providerBaseUrlsForManifest(manifestUrl)
+            val baseUrls = providerBaseUrlsForManifest(effectiveManifestUrl)
             val previousForRepo = previousScrapers.values
                 .filter { it.repositoryUrl == manifestUrl }
                 .associateBy { it.id }
@@ -500,7 +505,7 @@ actual object PluginRepository {
                             val scraperId = "${manifestUrl.lowercase()}:${info.id}"
                             val previous = previousForRepo[scraperId]
                             val sameVersion = previous != null && previous.version == info.version
-                            val isCs3 = info.formats?.contains("cs3") == true || info.filename.endsWith(".cs3")
+                            val isCs3 = info.formats?.any { it.contains("cs3", ignoreCase = true) } == true || info.filename.contains(".cs3", ignoreCase = true)
                             // Bound: never download all providers at once on app launch.
                             providerFetchPermits.withPermit {
                             runCatching {
@@ -589,7 +594,20 @@ actual object PluginRepository {
         if (manifestUrl == NETMAX_PROVIDER_MANIFEST) {
             listOf(NETMAX_PROVIDER_BASE_RAW, NETMAX_PROVIDER_BASE_CDN, NETMAX_PROVIDER_BASE_GITHACK)
         } else {
-            listOf(manifestUrl.substringBefore("?").removeSuffix("/manifest.json") + "/")
+            val cleanPath = manifestUrl.substringBefore("?")
+            val basePath = if (cleanPath.contains('/')) {
+                val beforeLast = cleanPath.substringBeforeLast('/')
+                if (beforeLast.startsWith("http://") || beforeLast.startsWith("https://")) {
+                    "$beforeLast/"
+                } else {
+                    cleanPath.removeSuffix("/manifest.json")
+                        .removeSuffix("/repo.json")
+                        .removeSuffix("/plugins.json") + "/"
+                }
+            } else {
+                "$cleanPath/"
+            }
+            listOf(basePath)
         }
 
     private suspend fun fetchProviderCode(
@@ -597,7 +615,7 @@ actual object PluginRepository {
         baseUrls: List<String>,
         isCs3: Boolean = false,
     ): String {
-        if (isCs3 || filename.endsWith(".cs3")) {
+        if (isCs3 || filename.contains(".cs3", ignoreCase = true)) {
             val bytes = if (filename.startsWith("http://") || filename.startsWith("https://")) {
                 httpGetBytes(filename)
             } else {
@@ -611,6 +629,7 @@ actual object PluginRepository {
                 }
                 result ?: throw IllegalStateException("Unable to fetch CS3 binary: $filename")
             }
+            if (bytes.isEmpty()) throw IllegalStateException("Downloaded empty binary for: $filename")
             return java.util.Base64.getEncoder().encodeToString(bytes)
         }
 

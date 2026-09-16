@@ -68,8 +68,18 @@ data class PluginScraper(
     val code: String,
 ) {
     fun supportsType(type: String): Boolean {
+        if (supportedTypes.isEmpty()) return true
         val normalizedType = normalizePluginType(type)
-        return supportedTypes.map { normalizePluginType(it) }.contains(normalizedType)
+        return supportedTypes.any { supported ->
+            val normSupported = normalizePluginType(supported)
+            normSupported == normalizedType ||
+                normSupported == "all" ||
+                normSupported == "universal" ||
+                normSupported == "others" ||
+                normSupported == "other" ||
+                (normalizedType == "anime" && (normSupported == "tv" || normSupported == "movie")) ||
+                (normSupported == "anime" && (normalizedType == "tv" || normalizedType == "movie"))
+        }
     }
 }
 
@@ -198,7 +208,7 @@ internal fun StoredPluginScraper.restorePluginScraper(
             description = description,
             version = version,
             filename = filename,
-            supportedTypes = supportedTypes,
+            supportedTypes = if (supportedTypes.isEmpty()) listOf("movie", "tv", "anime") else supportedTypes,
             enabled = enabled,
             manifestEnabled = manifestEnabled,
             hasSettings = hasSettings,
@@ -212,7 +222,11 @@ internal fun StoredPluginScraper.restorePluginScraper(
 }
 
 internal fun normalizePluginType(value: String): String =
-    when (value.lowercase()) {
-        "series", "show", "other" -> "tv"
-        else -> value.lowercase()
+    when (value.trim().lowercase()) {
+        "movie", "movies", "film", "films", "animemovie" -> "movie"
+        "tv", "series", "tvseries", "show", "shows", "tvshow", "tvshows", "ova", "cartoon", "asiandrama", "documentary" -> "tv"
+        "anime" -> "anime"
+        "all", "universal" -> "all"
+        "other", "others" -> "others"
+        else -> value.trim().lowercase()
     }

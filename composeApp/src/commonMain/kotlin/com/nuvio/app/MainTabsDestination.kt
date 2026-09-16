@@ -217,10 +217,18 @@ internal fun MainTabsDestination(
                             else -> {}
                         }
                     }
+                    val currentTabIndex = swipeTabs.indexOf(selectedTab).coerceAtLeast(0)
                     NuvioNavigationBar(
                         modifier = Modifier.align(Alignment.BottomCenter),
                         scrollState = navBarScrollState,
                         hazeState = navBarHazeState,
+                        selectedTabIndex = currentTabIndex,
+                        tabsCount = swipeTabs.size,
+                        onTabSelected = { index ->
+                            if (index in swipeTabs.indices) {
+                                onTabSelected(swipeTabs[index])
+                            }
+                        },
                         onSwipeLeft = { switchTabBySwipe(1) },
                         onSwipeRight = { switchTabBySwipe(-1) },
                     ) {

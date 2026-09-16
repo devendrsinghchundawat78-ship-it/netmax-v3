@@ -158,7 +158,9 @@ fun QuickWatchScreen(
 
     // Strict 3-video sliding window: actively preload current and next 2 items
     LaunchedEffect(pagerState.currentPage, feed.size) {
-        if (feed.isNotEmpty()) {
+        if (feed.isNotEmpty() && pagerState.currentPage in feed.indices) {
+            val currentItem = feed[pagerState.currentPage]
+            QuickWatchFeedRepository.markVideoAsSeen(currentItem.youtubeVideoId)
             QuickWatchPreloadController.onCurrentIndexChanged(pagerState.currentPage, feed)
         }
         if (pagerState.currentPage >= feed.size - 3) {

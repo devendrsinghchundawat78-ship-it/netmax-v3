@@ -8,6 +8,9 @@ import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,8 +34,14 @@ object QuickWatchFeedRepository {
     private var isFetching = false
     private val seenVideoIds = mutableSetOf<String>()
     private val seenTmdbIds = mutableSetOf<Int>()
+    private var hasLoadedSeenFromDisk = false
 
     fun ensureLoaded() {
+        if (!hasLoadedSeenFromDisk) {
+            hasLoadedSeenFromDisk = true
+            val persistedSeen = runCatching { QuickWatchSettingsStorage.loadSeenVideoIds() }.getOrDefault(emptySet())
+            seenVideoIds.addAll(persistedSeen)
+        }
         if (_feed.value.isEmpty() && !_isLoading.value) {
             loadFeed(page = 1, reset = true)
         }
@@ -45,6 +54,21 @@ object QuickWatchFeedRepository {
     fun loadMore() {
         if (!isFetching && _feed.value.isNotEmpty()) {
             loadFeed(page = currentPage + 1, reset = false)
+        }
+    }
+
+    fun markVideoAsSeen(videoId: String) {
+        if (videoId.isBlank()) return
+        if (seenVideoIds.add(videoId)) {
+            // Keep at most 200 in persistent storage
+            if (seenVideoIds.size > 200) {
+                val toRetain = seenVideoIds.toList().takeLast(150).toSet()
+                seenVideoIds.clear()
+                seenVideoIds.addAll(toRetain)
+            }
+            scope.launch(Dispatchers.IO) {
+                runCatching { QuickWatchSettingsStorage.saveSeenVideoIds(seenVideoIds) }
+            }
         }
     }
 
@@ -77,17 +101,21 @@ object QuickWatchFeedRepository {
 
         scope.launch {
             try {
+                if (!hasLoadedSeenFromDisk) {
+                    hasLoadedSeenFromDisk = true
+                    val persistedSeen = runCatching { QuickWatchSettingsStorage.loadSeenVideoIds() }.getOrDefault(emptySet())
+                    seenVideoIds.addAll(persistedSeen)
+                }
+
                 val newItems = fetchFeedItems(page)
                 withContext(Dispatchers.Main) {
                     if (reset) {
-                        seenVideoIds.clear()
                         seenTmdbIds.clear()
-                        seenVideoIds.addAll(newItems.map { it.youtubeVideoId })
                         seenTmdbIds.addAll(newItems.map { it.tmdbId })
                         _feed.value = newItems
                         currentPage = 1
                     } else {
-                        val filtered = newItems.filter { seenVideoIds.add(it.youtubeVideoId) && seenTmdbIds.add(it.tmdbId) }
+                        val filtered = newItems.filter { seenTmdbIds.add(it.tmdbId) }
                         _feed.value = _feed.value + filtered
                         currentPage = page
                     }
@@ -102,91 +130,154 @@ object QuickWatchFeedRepository {
     }
 
     private suspend fun fetchFeedItems(page: Int): List<QuickWatchItem> = withContext(Dispatchers.Default) {
-        // Fetch catalogs of popular/trending movies and series
-        val movieCatalog = TmdbHomeCatalogResolver.fetchCatalog(
-            endpoint = "trending/movie/day",
-            mediaType = "movie",
-            page = page,
-        )
-        val seriesCatalog = TmdbHomeCatalogResolver.fetchCatalog(
-            endpoint = "trending/tv/day",
-            mediaType = "series",
-            page = page,
-        )
-        val bollywoodCatalog = if (page == 1) {
-            TmdbHomeCatalogResolver.fetchCatalog(
-                endpoint = "discover/movie",
-                queryParams = mapOf("with_original_language" to "hi", "sort_by" to "popularity.desc"),
-                mediaType = "movie",
-                page = 1,
-            )
-        } else null
+        val allDefinitions = TmdbHomeCatalogResolver.getTmdbCatalogDefinitions()
 
-        val allPreviews = mutableListOf<MetaPreview>()
-        val maxLen = maxOf(movieCatalog.items.size, seriesCatalog.items.size)
-        for (i in 0 until maxLen) {
-            movieCatalog.items.getOrNull(i)?.let { allPreviews.add(it) }
-            seriesCatalog.items.getOrNull(i)?.let { allPreviews.add(it) }
-            bollywoodCatalog?.items?.getOrNull(i)?.let { allPreviews.add(it) }
+        // Pick 4 diverse catalog categories to query
+        val selectedDefs = if (page == 1) {
+            allDefinitions.shuffled().take(4)
+        } else {
+            allDefinitions.shuffled().take(3)
         }
+
+        // Randomize page offset for initial load / refresh so it never pulls the exact same rank 1..20 movies
+        val basePage = if (page == 1) (1..4).random() else page
+
+        val allPreviews = coroutineScope {
+            selectedDefs.mapIndexed { idx, def ->
+                async {
+                    val endpoint = TmdbHomeCatalogResolver.endpointForDefinition(def)
+                    val queryParams = TmdbHomeCatalogResolver.queryParamsForDefinition(def)
+                    val targetPage = if (page == 1) ((basePage + idx - 1) % 4) + 1 else page
+                    runCatching {
+                        TmdbHomeCatalogResolver.fetchCatalog(
+                            endpoint = endpoint,
+                            queryParams = queryParams,
+                            mediaType = def.type,
+                            page = targetPage,
+                        ).items
+                    }.getOrDefault(emptyList())
+                }
+            }.awaitAll().flatten()
+        }.distinctBy { it.id }.shuffled()
 
         val todayIso = CurrentDateProvider.todayIsoDate()
         val items = mutableListOf<QuickWatchItem>()
         val localSeenTmdb = mutableSetOf<Int>()
 
-        for (preview in allPreviews.distinctBy { it.id }) {
+        for (preview in allPreviews) {
             val tmdbId = preview.id.removePrefix("tmdb:").toIntOrNull() ?: continue
             if (seenTmdbIds.contains(tmdbId) || localSeenTmdb.contains(tmdbId)) continue
 
             val mediaType = if (preview.type == "series" || preview.type == "tv") "tv" else "movie"
 
-            val trailers = runCatching {
-                TmdbMetadataService.fetchTrailers(
-                    tmdbId = tmdbId,
-                    mediaType = mediaType,
-                    language = "en",
-                )
-            }.getOrDefault(emptyList())
+            // Fetch TMDB official trailers/teasers/clips in parallel with YouTube Shorts
+            val (trailers, shorts) = coroutineScope {
+                val trailersDeferred = async {
+                    runCatching {
+                        TmdbMetadataService.fetchTrailers(
+                            tmdbId = tmdbId,
+                            mediaType = mediaType,
+                            language = "en",
+                        )
+                    }.getOrDefault(emptyList())
+                }
+                val shortsDeferred = async {
+                    runCatching {
+                        MovieShortsResolver.fetchShortsForMovie(preview.name, limit = 2)
+                    }.getOrDefault(emptyList())
+                }
+                trailersDeferred.await() to shortsDeferred.await()
+            }
 
-            val validVideos = trailers.filter { it.site.equals("YouTube", ignoreCase = true) && it.key.isNotBlank() }
-            if (validVideos.isEmpty()) continue
+            val validTrailers = trailers.filter {
+                it.site.equals("YouTube", ignoreCase = true) &&
+                    it.key.isNotBlank() &&
+                    !seenVideoIds.contains(it.key)
+            }
 
-            // Pick the single best official trailer or teaser for this movie (never duplicate the same movie)
-            val bestVideo = validVideos.firstOrNull { it.type.equals("Trailer", ignoreCase = true) }
-                ?: validVideos.firstOrNull { it.type.equals("Teaser", ignoreCase = true) }
-                ?: validVideos.first()
+            val validShorts = shorts.filter {
+                it.videoId.isNotBlank() &&
+                    !seenVideoIds.contains(it.videoId)
+            }
 
-            if (seenVideoIds.contains(bestVideo.key)) continue
+            if (validTrailers.isEmpty() && validShorts.isEmpty()) continue
 
             val releaseYear = preview.releaseInfo?.take(4)
             val isWatchable = preview.releaseInfo?.let { it <= todayIso } ?: true
 
-            val item = QuickWatchItem(
-                id = "${bestVideo.key}_$tmdbId",
-                youtubeVideoId = bestVideo.key,
-                youtubeUrl = "https://www.youtube.com/watch?v=${bestVideo.key}",
-                title = bestVideo.name.ifBlank { preview.name },
-                videoType = bestVideo.type.ifBlank { "Trailer" },
-                movieTitle = preview.name,
-                movieOverview = preview.description.orEmpty(),
-                moviePoster = preview.poster,
-                movieBackdrop = preview.banner ?: preview.poster,
-                movieLogo = preview.logo,
-                releaseDate = preview.releaseInfo,
-                releaseYear = releaseYear,
-                tmdbId = tmdbId,
-                mediaType = preview.type,
-                genres = preview.genres,
-                voteAverage = preview.imdbRating?.toDoubleOrNull(),
-                isWatchable = isWatchable,
-                likeCount = (120..4500).random(), // Initial display counter
-                commentCount = (8..340).random(),
-                isLiked = _likedItemIds.value.contains(bestVideo.key),
-            )
-            items.add(item)
+            // 1. Add YouTube Shorts for this movie (if found)
+            for (short in validShorts.take(1)) {
+                items.add(
+                    QuickWatchItem(
+                        id = "short_${short.videoId}_$tmdbId",
+                        youtubeVideoId = short.videoId,
+                        youtubeUrl = "https://www.youtube.com/shorts/${short.videoId}",
+                        title = short.title.ifBlank { "${preview.name} Shorts" },
+                        videoType = "Shorts",
+                        movieTitle = preview.name,
+                        movieOverview = preview.description.orEmpty(),
+                        moviePoster = preview.poster,
+                        movieBackdrop = preview.banner ?: preview.poster,
+                        movieLogo = preview.logo,
+                        releaseDate = preview.releaseInfo,
+                        releaseYear = releaseYear,
+                        tmdbId = tmdbId,
+                        mediaType = preview.type,
+                        genres = preview.genres,
+                        voteAverage = preview.imdbRating?.toDoubleOrNull(),
+                        isWatchable = isWatchable,
+                        likeCount = (450..9200).random(),
+                        commentCount = (24..680).random(),
+                        isLiked = _likedItemIds.value.contains(short.videoId),
+                    )
+                )
+            }
+
+            // 2. Add official trailer or teaser for this movie (if found)
+            val bestTrailer = validTrailers.firstOrNull { it.type.equals("Trailer", ignoreCase = true) }
+                ?: validTrailers.firstOrNull { it.type.equals("Teaser", ignoreCase = true) }
+                ?: validTrailers.firstOrNull { it.type.equals("Clip", ignoreCase = true) }
+                ?: validTrailers.firstOrNull()
+
+            if (bestTrailer != null) {
+                items.add(
+                    QuickWatchItem(
+                        id = "trailer_${bestTrailer.key}_$tmdbId",
+                        youtubeVideoId = bestTrailer.key,
+                        youtubeUrl = "https://www.youtube.com/watch?v=${bestTrailer.key}",
+                        title = bestTrailer.name.ifBlank { preview.name },
+                        videoType = bestTrailer.type.ifBlank { "Trailer" },
+                        movieTitle = preview.name,
+                        movieOverview = preview.description.orEmpty(),
+                        moviePoster = preview.poster,
+                        movieBackdrop = preview.banner ?: preview.poster,
+                        movieLogo = preview.logo,
+                        releaseDate = preview.releaseInfo,
+                        releaseYear = releaseYear,
+                        tmdbId = tmdbId,
+                        mediaType = preview.type,
+                        genres = preview.genres,
+                        voteAverage = preview.imdbRating?.toDoubleOrNull(),
+                        isWatchable = isWatchable,
+                        likeCount = (120..4500).random(),
+                        commentCount = (8..340).random(),
+                        isLiked = _likedItemIds.value.contains(bestTrailer.key),
+                    )
+                )
+            }
+
             localSeenTmdb.add(tmdbId)
         }
 
-        items
+        // Safety fallback: if user has seen a lot and items count is low, evict older seen IDs
+        if (items.size < 5 && seenVideoIds.size > 50) {
+            val toKeep = seenVideoIds.toList().takeLast(30).toSet()
+            seenVideoIds.clear()
+            seenVideoIds.addAll(toKeep)
+            runCatching { QuickWatchSettingsStorage.saveSeenVideoIds(seenVideoIds) }
+        }
+
+        // Shuffle items so YouTube Shorts and Trailers naturally interleave
+        items.shuffled()
     }
 }

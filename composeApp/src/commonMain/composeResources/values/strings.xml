@@ -1922,7 +1922,7 @@
     <!-- Player iOS video settings modal -->
     <string name="player_video_settings_title">Video</string>
     <string name="player_visual_enhancer_title">Visual Enhancer</string>
-    <string name="player_visual_enhancer_desc">Boost color vibrancy, contrast, and clarity like MX Player.</string>
+    <string name="player_visual_enhancer_desc">Boost color vibrancy, contrast, and picture clarity.</string>
     <string name="player_visual_enhancer_presets">Enhancement Mode</string>
     <string name="player_visual_enhancer_fine_tune">Fine Tuning</string>
     <string name="player_video_settings_reset_tuning">Reset tuning</string>
