@@ -49,7 +49,7 @@ internal actual object QuickWatchSettingsStorage {
     }
 
     actual fun saveSeenVideoIds(ids: Set<String>) {
-        val raw = ids.takeLast(200).joinToString(",")
+        val raw = ids.toList().takeLast(200).joinToString(",")
         preferences?.edit()
             ?.putString(ProfileScopedKey.of(KEY_SEEN_IDS), raw)
             ?.apply()

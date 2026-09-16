@@ -48,7 +48,7 @@ internal actual object QuickWatchSettingsStorage {
     }
 
     actual fun saveSeenVideoIds(ids: Set<String>) {
-        val raw = ids.takeLast(200).joinToString(",")
+        val raw = ids.toList().takeLast(200).joinToString(",")
         val def = NSUserDefaults.standardUserDefaults
         def.setObject(raw, forKey = KEY_SEEN_IDS)
     }
