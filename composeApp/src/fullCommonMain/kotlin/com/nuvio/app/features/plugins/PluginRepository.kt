@@ -59,6 +59,12 @@ private const val NETMAX_PROVIDER_MANIFEST_CDN =
     "https://cdn.jsdelivr.net/gh/NuvioPlugin/All-in-One-Nuvio@main/manifest.json"
 private const val NETMAX_PROVIDER_MANIFEST_GITHACK =
     "https://raw.githack.com/NuvioPlugin/All-in-One-Nuvio/main/manifest.json"
+private const val CLOUDSTREAM_PROVIDER_MANIFEST =
+    "https://raw.githubusercontent.com/hexated/cloudstream-extensions-hexated/builds/plugins.json"
+private const val CLOUDSTREAM_PROVIDER_MANIFEST_CDN =
+    "https://cdn.jsdelivr.net/gh/hexated/cloudstream-extensions-hexated@builds/plugins.json"
+private const val CLOUDSTREAM_PROVIDER_MANIFEST_GITHACK =
+    "https://raw.githack.com/hexated/cloudstream-extensions-hexated/builds/plugins.json"
 private const val NETMAX_PROVIDER_BASE_RAW =
     "https://raw.githubusercontent.com/NuvioPlugin/All-in-One-Nuvio/refs/heads/main/"
 private const val NETMAX_PROVIDER_BASE_CDN =
@@ -149,6 +155,27 @@ actual object PluginRepository {
             )
         }
 
+        val hasCloudStreamRepo = _uiState.value.repositories.any {
+            it.manifestUrl == CLOUDSTREAM_PROVIDER_MANIFEST
+        }
+        if (!hasCloudStreamRepo) {
+            _uiState.update { state ->
+                state.copy(
+                    repositories = state.repositories + PluginRepositoryItem(
+                        manifestUrl = CLOUDSTREAM_PROVIDER_MANIFEST,
+                        name = "CloudStream Providers",
+                        isRefreshing = true,
+                    )
+                )
+            }
+            persist()
+            refreshRepositoryInternal(
+                CLOUDSTREAM_PROVIDER_MANIFEST,
+                pushAfterRefresh = false,
+                ensureInitialized = false,
+            )
+        }
+
         if (isFirstInit) {
             // Auto-update all plugin repositories on every app launch
             val state = _uiState.value
@@ -190,7 +217,7 @@ actual object PluginRepository {
                 }
                 .decodeList<PluginRow>()
 
-            val urls = (dedupeManifestUrls(rows.map { it.url }) + NETMAX_PROVIDER_MANIFEST).distinct()
+            val urls = (dedupeManifestUrls(rows.map { it.url }) + listOf(NETMAX_PROVIDER_MANIFEST, CLOUDSTREAM_PROVIDER_MANIFEST)).distinct()
             if (rows.isEmpty() && !pulledFromServer) {
                 val localUrls = _uiState.value.repositories.map { it.manifestUrl }
                 if (localUrls.isNotEmpty()) {
@@ -577,10 +604,10 @@ actual object PluginRepository {
     }
 
     private suspend fun fetchTextWithMirrors(url: String): String {
-        val candidates = if (url == NETMAX_PROVIDER_MANIFEST) {
-            listOf(NETMAX_PROVIDER_MANIFEST, NETMAX_PROVIDER_MANIFEST_CDN, NETMAX_PROVIDER_MANIFEST_GITHACK)
-        } else {
-            listOf(url)
+        val candidates = when (url) {
+            NETMAX_PROVIDER_MANIFEST -> listOf(NETMAX_PROVIDER_MANIFEST, NETMAX_PROVIDER_MANIFEST_CDN, NETMAX_PROVIDER_MANIFEST_GITHACK)
+            CLOUDSTREAM_PROVIDER_MANIFEST -> listOf(CLOUDSTREAM_PROVIDER_MANIFEST, CLOUDSTREAM_PROVIDER_MANIFEST_CDN, CLOUDSTREAM_PROVIDER_MANIFEST_GITHACK)
+            else -> listOf(url)
         }
         var lastError: Throwable? = null
         for (candidate in candidates.distinct()) {

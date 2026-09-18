@@ -79,6 +79,7 @@ import com.nuvio.app.features.music.MusicDownloadManager
 import com.nuvio.app.features.music.MusicLibraryRepository
 import com.nuvio.app.features.music.MusicPlaybackController
 import com.nuvio.app.features.music.MusicService
+import com.nuvio.app.features.music.ClashFlacService
 import com.nuvio.app.features.music.MusicTab
 import com.nuvio.app.features.music.MusicTrack
 import kotlinx.coroutines.delay
@@ -127,8 +128,15 @@ fun MusicScreen(
         }
         delay(400)
         isSearching = true
-        val res = MusicService.searchSongs(q)
-        searchResults = res.getOrDefault(emptyList())
+        val flacResults = ClashFlacService.searchFlac(q).getOrDefault(emptyList())
+        val saavnResults = MusicService.searchSongs(q).getOrDefault(emptyList())
+        searchResults = if (flacResults.isNotEmpty()) {
+            flacResults + saavnResults.filterNot { s ->
+                flacResults.any { f -> f.title.equals(s.title, ignoreCase = true) }
+            }
+        } else {
+            saavnResults
+        }
         isSearching = false
     }
 

@@ -1,24 +1,48 @@
 package com.lagradost.cloudstream3.mvvm
 
+import okhttp3.ResponseBody
+
+sealed class Resource<out T> {
+    data class Success<out T>(val value: T) : Resource<T>()
+    data class Failure(
+        val isNetworkError: Boolean,
+        val errorCode: Int? = null,
+        val errorResponse: ResponseBody? = null,
+        val errorString: String = "",
+    ) : Resource<Nothing>() {
+        constructor(isNetworkError: Boolean, errorString: String) : this(
+            isNetworkError = isNetworkError,
+            errorCode = null,
+            errorResponse = null,
+            errorString = errorString
+        )
+    }
+    data class Loading(val url: String? = null) : Resource<Nothing>()
+}
+
 fun logError(throwable: Throwable) {
-    System.err.println("LOG_ERROR: ${throwable.message}")
     throwable.printStackTrace()
 }
 
-suspend fun <T> safeApiCall(apiCall: suspend () -> T): T? {
+fun <T> safe(block: () -> T): T? {
     return try {
-        apiCall()
-    } catch (throwable: Throwable) {
-        logError(throwable)
+        block()
+    } catch (e: Throwable) {
+        logError(e)
         null
     }
 }
 
-suspend fun <T> suspendSafeApiCall(apiCall: suspend () -> T): T? {
+suspend fun <T> safeApiCall(
+    apiCall: suspend () -> T,
+): Resource<T> {
     return try {
-        apiCall()
+        Resource.Success(apiCall())
     } catch (throwable: Throwable) {
         logError(throwable)
-        null
+        Resource.Failure(
+            isNetworkError = false,
+            errorString = throwable.message ?: "Error"
+        )
     }
 }

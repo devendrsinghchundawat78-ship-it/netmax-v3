@@ -17,6 +17,9 @@ data class MusicTrack(
     val isLiked: Boolean = false,
     val isDownloaded: Boolean = false,
     val addedAtMs: Long = 0L,
+    val isFlac: Boolean = false,
+    val flacAsin: String? = null,
+    val currentQuality: String? = null,
 ) {
     val durationFormatted: String
         get() {
@@ -41,10 +44,12 @@ enum class MusicRepeatMode {
 enum class MusicQuality(val label: String, val bitrateString: String) {
     LOW_96("96 kbps (Data Saver)", "96kbps"),
     MEDIUM_160("160 kbps (Standard)", "160kbps"),
-    HIGH_320("320 kbps (High Quality)", "320kbps");
+    HIGH_320("320 kbps (High Quality)", "320kbps"),
+    LOSSLESS_FLAC("Hi-Res FLAC (Lossless)", "flac");
 
     companion object {
-        fun fromBitrate(bitrate: String): MusicQuality = when (bitrate) {
+        fun fromBitrate(bitrate: String): MusicQuality = when (bitrate.lowercase()) {
+            "flac", "lossless", "hi-res", "uhd", "hd" -> LOSSLESS_FLAC
             "96kbps", "96" -> LOW_96
             "160kbps", "160" -> MEDIUM_160
             else -> HIGH_320

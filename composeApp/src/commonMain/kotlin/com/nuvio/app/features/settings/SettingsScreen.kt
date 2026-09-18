@@ -132,6 +132,7 @@ fun SettingsScreen(
     onContinueWatchingClick: () -> Unit = {},
     onAddonsClick: () -> Unit = {},
     onPluginsClick: () -> Unit = {},
+    onPluginStoreClick: () -> Unit = {},
     onDownloadsClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
     onNetmaxAiClick: (() -> Unit)? = null,
@@ -316,6 +317,11 @@ fun SettingsScreen(
             { openPage(SettingsPage.Plugins) }
         } else {
             onPluginsClick
+        }
+        val openPluginStore = if (onNavigatePage != null) {
+            { openPage(SettingsPage.PluginStore) }
+        } else {
+            onPluginStoreClick
         }
         val openAccount = if (onNavigatePage != null) {
             { openPage(SettingsPage.Account) }
@@ -635,6 +641,11 @@ private fun MobileSettingsScreen(
                             onPluginsClick()
                         }
                     }
+                    SettingsPage.PluginStore -> {
+                        if (AppFeaturePolicy.pluginsEnabled) {
+                            openPluginStore()
+                        }
+                    }
                     SettingsPage.Homescreen -> onHomescreenClick()
                     SettingsPage.MetaScreen -> onMetaScreenClick()
                     else -> onPageChange(target.page)
@@ -805,9 +816,11 @@ private fun MobileSettingsScreen(
                     showPluginsEntry = AppFeaturePolicy.pluginsEnabled,
                     onAddonsClick = onAddonsClick,
                     onPluginsClick = onPluginsClick,
+                    onPluginStoreClick = openPluginStore,
                 )
                 SettingsPage.Addons -> addonsSettingsContent()
                 SettingsPage.Plugins -> if (AppFeaturePolicy.pluginsEnabled) pluginsSettingsContent() else addonsSettingsContent()
+                SettingsPage.PluginStore -> if (AppFeaturePolicy.pluginsEnabled) pluginStoreSettingsContent() else addonsSettingsContent()
                 SettingsPage.Homescreen -> homescreenSettingsContent(
                     isTablet = false,
                     heroEnabled = homescreenHeroEnabled,
@@ -1241,9 +1254,11 @@ private fun TabletSettingsScreen(
                         showPluginsEntry = AppFeaturePolicy.pluginsEnabled,
                         onAddonsClick = { openInlinePage(SettingsPage.Addons) },
                         onPluginsClick = { openInlinePage(SettingsPage.Plugins) },
+                        onPluginStoreClick = { openInlinePage(SettingsPage.PluginStore) },
                     )
                     SettingsPage.Addons -> addonsSettingsContent()
                     SettingsPage.Plugins -> if (AppFeaturePolicy.pluginsEnabled) pluginsSettingsContent() else addonsSettingsContent()
+                    SettingsPage.PluginStore -> if (AppFeaturePolicy.pluginsEnabled) pluginStoreSettingsContent() else addonsSettingsContent()
                     SettingsPage.Homescreen -> homescreenSettingsContent(
                         isTablet = true,
                         heroEnabled = homescreenHeroEnabled,

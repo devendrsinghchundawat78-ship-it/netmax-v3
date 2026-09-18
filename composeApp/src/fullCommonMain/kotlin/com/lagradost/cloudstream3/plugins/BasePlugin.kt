@@ -16,6 +16,9 @@ open class BasePlugin {
     val registeredApis = mutableListOf<MainAPI>()
     val registeredExtractors = mutableListOf<ExtractorApi>()
 
+    var resources: Any? = null
+    var filename: String = ""
+
     open fun load() {}
 
     open fun load(context: Any) {
@@ -39,5 +42,4 @@ open class BasePlugin {
     }
 }
 
-// Backward compatibility alias
-typealias Plugin = BasePlugin
+open class Plugin : BasePlugin()

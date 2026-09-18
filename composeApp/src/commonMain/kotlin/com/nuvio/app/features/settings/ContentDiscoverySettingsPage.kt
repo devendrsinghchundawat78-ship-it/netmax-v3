@@ -16,6 +16,7 @@ internal fun LazyListScope.contentDiscoveryContent(
     showPluginsEntry: Boolean,
     onAddonsClick: () -> Unit,
     onPluginsClick: () -> Unit,
+    onPluginStoreClick: () -> Unit = {},
 ) {
     item {
         SettingsSection(
@@ -41,6 +42,12 @@ internal fun LazyListScope.contentDiscoveryContent(
                         description = stringResource(Res.string.settings_content_discovery_plugins_description),
                         isTablet = isTablet,
                         onClick = onPluginsClick,
+                    )
+                    SettingsNavigationRow(
+                        title = "Plugin Store",
+                        description = "Browse, install, and uninstall streaming plugins and providers",
+                        isTablet = isTablet,
+                        onClick = onPluginStoreClick,
                     )
                 }
             }

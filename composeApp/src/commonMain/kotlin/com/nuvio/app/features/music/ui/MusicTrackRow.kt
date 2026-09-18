@@ -141,7 +141,23 @@ fun MusicTrackRow(
                     modifier = Modifier.weight(1f, fill = false),
                 )
 
-                if (track.bitrate320Available) {
+                if (track.isFlac) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFE0A96D).copy(alpha = 0.22f))
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = "FLAC",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            color = Color(0xFFE0A96D),
+                        )
+                    }
+                } else if (track.bitrate320Available) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))

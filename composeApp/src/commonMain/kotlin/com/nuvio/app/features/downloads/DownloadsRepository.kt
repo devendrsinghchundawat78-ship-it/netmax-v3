@@ -152,6 +152,7 @@ object DownloadsRepository {
             episodeTitle = episodeTitle,
             fallbackTitle = stream.streamLabel,
             sourceUrl = sourceUrl,
+            stream = stream,
             nowEpochMs = now,
         )
 
@@ -495,6 +496,7 @@ private fun buildFileName(
     episodeTitle: String?,
     fallbackTitle: String,
     sourceUrl: String,
+    stream: StreamItem,
     nowEpochMs: Long,
 ): String {
     val baseTitle = if (seasonNumber != null && episodeNumber != null) {
@@ -513,7 +515,7 @@ private fun buildFileName(
         title.ifBlank { fallbackTitle }
     }
 
-    val extension = sourceUrl.fileExtensionFromUrl()
+    val extension = stream.downloadFileExtension.ifBlank { sourceUrl.fileExtensionFromUrl() }
     return buildString {
         append(baseTitle.sanitizeFileName().ifBlank { "download" }.take(92))
         append('_')
@@ -528,9 +530,13 @@ private fun String.sanitizeFileName(): String =
 
 private fun String.fileExtensionFromUrl(): String {
     val withoutQuery = substringBefore('?').substringBefore('#')
-    val suffix = withoutQuery.substringAfterLast('.', missingDelimiterValue = "")
-        .lowercase()
-        .trim()
+    val lastSegment = withoutQuery.substringAfterLast('/')
+    val dotIndex = lastSegment.lastIndexOf('.')
+    val suffix = if (dotIndex >= 0 && dotIndex < lastSegment.length - 1) {
+        lastSegment.substring(dotIndex + 1).lowercase().trim()
+    } else {
+        ""
+    }
 
     val mapped = if (suffix.length in 2..5 && suffix.all { it.isLetterOrDigit() }) {
         suffix
@@ -540,4 +546,5 @@ private fun String.fileExtensionFromUrl(): String {
     // HLS playlists are saved as a single concatenated transport-stream file.
     return if (mapped == "m3u8") "ts" else mapped
 }
+
 

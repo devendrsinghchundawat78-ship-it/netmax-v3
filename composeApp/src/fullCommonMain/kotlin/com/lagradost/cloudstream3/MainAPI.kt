@@ -16,7 +16,16 @@ val mapper: JsonMapper by lazy {
     builder.build()
 }
 
+data class SettingsJson(
+    var enableAdult: Boolean = true,
+)
+
 abstract class MainAPI {
+    companion object {
+        var settingsForProvider: SettingsJson = SettingsJson()
+        var overrideData: HashMap<String, Any>? = null
+    }
+
     open var name: String = "Unnamed"
     open var mainUrl: String = ""
     open var lang: String = "en"
@@ -28,6 +37,11 @@ abstract class MainAPI {
     open val mainPage: List<MainPageData> = emptyList()
 
     open suspend fun search(query: String): List<SearchResponse>? = null
+
+    open suspend fun search(query: String, page: Int): SearchResponseList? {
+        val res = search(query) ?: return null
+        return SearchResponseList(res)
+    }
 
     open suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
@@ -53,6 +67,31 @@ fun MainAPI.fixUrlNull(url: String?): String? {
     if (url == null) return null
     return fixUrl(url)
 }
+
+fun fixTitle(title: String): String =
+    title.replace(Regex("[:\\-–—_()\\[\\]/.]"), " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+
+fun toRatingInt(rating: String?): Int? {
+    if (rating.isNullOrBlank()) return null
+    val cleaned = rating.replace("/10", "").replace("%", "").trim()
+    val d = cleaned.toDoubleOrNull() ?: return null
+    return if (d <= 10.0) (d * 1000).toInt() else (d * 100).toInt()
+}
+
+fun newHomePageResponse(
+    name: String,
+    list: List<SearchResponse>,
+    hasNext: Boolean = false,
+): HomePageResponse = HomePageResponse(listOf(HomePageList(name, list)), hasNext)
+
+fun newHomePageResponse(
+    items: List<HomePageList>,
+    hasNext: Boolean = false,
+): HomePageResponse = HomePageResponse(items, hasNext)
+
+fun List<SearchResponse>.toNewSearchResponseList(): SearchResponseList = SearchResponseList(this)
 
 fun mainPageOf(vararg elements: Pair<String, String>): List<MainPageData> =
     elements.map { MainPageData(name = it.second, data = it.first) }
@@ -198,6 +237,25 @@ fun base64Encode(string: String): String = java.util.Base64.getEncoder().encodeT
 fun AnimeLoadResponse.addEpisodes(status: DubStatus, episodes: List<Episode>) {
     this.episodes = this.episodes + (status to episodes)
 }
+
+fun AnimeSearchResponse.addDubStatus(
+    dub: Boolean,
+    sub: Boolean,
+    dubEpisodes: Int? = null,
+    subEpisodes: Int? = null,
+) {
+    val set = EnumSet.noneOf(DubStatus::class.java)
+    if (dub) set.add(DubStatus.Dubbed)
+    if (sub) set.add(DubStatus.Subbed)
+    this.dubStatus = set
+}
+
+fun SearchResponse.addDubStatus(
+    dub: Boolean,
+    sub: Boolean,
+    dubEpisodes: Int? = null,
+    subEpisodes: Int? = null,
+) {}
 
 fun Episode.addDate(date: String?, format: String? = null) {
     this.date = date

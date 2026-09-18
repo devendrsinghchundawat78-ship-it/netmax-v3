@@ -4,8 +4,9 @@ import com.nuvio.app.features.debrid.DirectDebridPlaybackResolver
 import com.nuvio.app.features.player.PlayerStreamsRepository
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamDebridCacheState
+import com.nuvio.app.features.streams.StreamsRepository
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 
 /** Loads the same provider universe used by the player, then exposes only real file URLs. */
@@ -24,30 +25,50 @@ object DownloadSourceResolver {
             forceRefresh = true,
         )
 
-        // Guarded wait: if stream resolution never finishes (stuck provider),
-        // fall back to the latest snapshot instead of hanging the download UI.
         val state = try {
-            withTimeout(30_000) {
-                PlayerStreamsRepository.sourceState.first { state ->
-                    !state.isAnyLoading || state.emptyStateReason != null
+            withTimeout(20_000) {
+                var firstDownloadableTime = -1L
+                delay(150)
+                while (true) {
+                    val current = PlayerStreamsRepository.sourceState.value
+                    val hasDownloadable = current.groups.any { group ->
+                        group.streams.any { it.isDownloadableFileSource() }
+                    }
+
+                    if (!current.isAnyLoading && (current.groups.isNotEmpty() || current.emptyStateReason != null)) {
+                        return@withTimeout current
+                    }
+
+                    if (hasDownloadable) {
+                        val now = DownloadsClock.nowEpochMs()
+                        if (firstDownloadableTime < 0L) {
+                            firstDownloadableTime = now
+                        } else if (now - firstDownloadableTime >= 2_500L) {
+                            return@withTimeout current
+                        }
+                    }
+
+                    delay(200)
                 }
+                PlayerStreamsRepository.sourceState.value
             }
         } catch (_: TimeoutCancellationException) {
             PlayerStreamsRepository.sourceState.value
         }
 
-        val direct = state.groups
-            .flatMap { it.streams }
-            .filter { it.isDownloadableFileSource() }
+        val direct = buildList {
+            addAll(state.groups.flatMap { it.streams }.filter { it.isDownloadableFileSource() })
+            addAll(StreamsRepository.uiState.value.groups.flatMap { it.streams }.filter { it.isDownloadableFileSource() })
+        }.distinctBy(::sourceIdentity)
 
         // A cached/direct-debrid source may only become downloadable after resolution.
-        val debridCandidates = state.groups
-            .flatMap { it.streams }
+        val debridCandidates = (state.groups.flatMap { it.streams } + StreamsRepository.uiState.value.groups.flatMap { it.streams })
             .filter { stream ->
                 stream !in direct &&
                     (stream.isDirectDebridStream || stream.debridCacheStatus?.state == StreamDebridCacheState.CACHED) &&
                     DirectDebridPlaybackResolver.shouldResolveToPlayableStream(stream)
             }
+            .distinctBy(::sourceIdentity)
             .take(MAX_DEBRID_RESOLVES)
 
         if (debridCandidates.isEmpty()) return direct.distinctBy(::sourceIdentity)
@@ -90,19 +111,27 @@ object DownloadSourceResolver {
     private const val MAX_DEBRID_RESOLVES = 4
 }
 
+internal fun String.extractFileExtension(): String? {
+    val pathWithoutQuery = substringBefore('?').substringBefore('#')
+    val lastSegment = pathWithoutQuery.substringAfterLast('/')
+    val dotIndex = lastSegment.lastIndexOf('.')
+    if (dotIndex < 0 || dotIndex >= lastSegment.length - 1) return null
+    val ext = lastSegment.substring(dotIndex + 1).trim().lowercase()
+    return ext.takeIf { it.length in 2..5 && it.all { c -> c.isLetterOrDigit() } }
+}
+
 internal val StreamItem.downloadableFileUrl: String?
     get() = playableDirectUrl?.trim()?.takeIf { it.isSupportedDownloadFileUrl() }
 
 internal val StreamItem.downloadFileExtension: String
     get() {
         val candidates = listOfNotNull(
-            downloadableFileUrl?.substringBefore('?')?.substringBefore('#')?.substringAfterLast('.', ""),
-            behaviorHints.filename?.substringBefore('?')?.substringBefore('#')?.substringAfterLast('.', ""),
-            clientResolve?.filename?.substringBefore('?')?.substringBefore('#')?.substringAfterLast('.', ""),
+            behaviorHints.filename?.extractFileExtension(),
+            clientResolve?.filename?.extractFileExtension(),
+            clientResolve?.stream?.raw?.filename?.extractFileExtension(),
+            downloadableFileUrl?.extractFileExtension(),
         )
-        val raw = candidates.firstOrNull { it.length in 2..5 && it.all(Char::isLetterOrDigit) }
-            ?.lowercase()
-            ?: "mp4"
+        val raw = candidates.firstOrNull { it.isNotBlank() } ?: "mp4"
         // HLS playlists are saved as a single concatenated transport-stream file.
         return if (raw == "m3u8") "ts" else raw
     }
@@ -168,6 +197,17 @@ internal val StreamItem.downloadQualityLabel: String
 internal fun StreamItem.isDownloadableFileSource(): Boolean =
     downloadableFileUrl != null
 
+private val UNSUPPORTED_DOWNLOAD_EXTENSIONS = setOf(
+    "html", "htm", "php", "asp", "aspx", "jsp", "json", "xml", "txt",
+    "jpg", "jpeg", "png", "gif", "webp", "svg", "ico", "bmp", "tiff",
+    "zip", "rar", "7z", "tar", "gz", "pdf", "apk", "exe", "iso", "mpd", "torrent",
+    "js", "css", "srt", "vtt", "ass", "sub", "idx", "cue", "log", "md"
+)
+
+private val KNOWN_VIDEO_EXTENSIONS = setOf(
+    "mp4", "mkv", "webm", "m4v", "mov", "avi", "ts", "mpeg", "mpg", "flv", "wmv", "3gp", "ogv", "m3u8"
+)
+
 internal fun String.isSupportedDownloadFileUrl(): Boolean {
     val normalized = trim()
     if (!normalized.startsWith("http://", ignoreCase = true) && !normalized.startsWith("https://", ignoreCase = true)) {
@@ -180,8 +220,20 @@ internal fun String.isSupportedDownloadFileUrl(): Boolean {
     if (lower.contains(".mpd") || lower.contains(".torrent")) return false
 
     val path = lower.substringBefore('?').substringBefore('#')
-    val extension = path.substringAfterLast('.', "")
-    return extension in setOf("mp4", "mkv", "webm", "m4v", "mov", "avi", "ts", "mpeg", "mpg")
+    val lastSegment = path.substringAfterLast('/')
+    val dotIndex = lastSegment.lastIndexOf('.')
+    val extension = if (dotIndex >= 0 && dotIndex < lastSegment.length - 1) {
+        lastSegment.substring(dotIndex + 1).trim()
+    } else {
+        ""
+    }
+
+    if (extension.isNotEmpty()) {
+        if (extension in UNSUPPORTED_DOWNLOAD_EXTENSIONS) return false
+        if (extension in KNOWN_VIDEO_EXTENSIONS) return true
+    }
+
+    return true
 }
 
 /** True for `http(s)` URLs whose path points at an HLS playlist (`.m3u8`). */
@@ -191,7 +243,7 @@ internal fun String.isHlsPlaylistUrl(): Boolean {
         return false
     }
     val path = normalized.substringBefore('?').substringBefore('#').lowercase()
-    return path.endsWith(".m3u8")
+    return path.endsWith(".m3u8") || path.contains(".m3u8/") || path.contains(".m3u8")
 }
 
 data class DownloadTarget(

@@ -132,6 +132,11 @@ internal enum class SettingsPage(
         category = SettingsCategory.General,
         parentPage = ContentDiscovery,
     ),
+    PluginStore(
+        titleRes = Res.string.compose_settings_page_plugins,
+        category = SettingsCategory.General,
+        parentPage = ContentDiscovery,
+    ),
     Homescreen(
         titleRes = Res.string.compose_settings_page_homescreen,
         category = SettingsCategory.General,

@@ -67,16 +67,68 @@ object MusicPlaybackController {
 
             // Resolve streaming or local URL
             val localTrack = MusicDownloadManager.getLocalTrack(track.id)
+            val currentPref = MusicSettingsRepository.settings.value.streamingQuality
             val streamUrl = localTrack?.localFilePath
-                ?: MusicService.resolveStreamUrl(
+                ?: MusicService.resolveStreamUrlAsync(
                     track = track,
-                    preferredQuality = MusicSettingsRepository.settings.value.streamingQuality,
+                    preferredQuality = currentPref,
+                ) ?: MusicService.resolveStreamUrl(
+                    track = track,
+                    preferredQuality = currentPref,
                 )
 
             if (!streamUrl.isNullOrBlank()) {
                 audioPlayer.playUrl(streamUrl)
             } else {
                 _playbackState.update { it.copy(isBuffering = false, isPlaying = false) }
+            }
+        }
+    }
+
+    fun changeQuality(newQuality: MusicQuality) {
+        scope.launch {
+            MusicSettingsRepository.setStreamingQuality(newQuality.bitrateString)
+            val currentTrack = _playbackState.value.currentTrack ?: return@launch
+            val currentPos = _playbackState.value.currentPositionMs
+            val wasPlaying = _playbackState.value.isPlaying
+
+            _playbackState.update { it.copy(isBuffering = true) }
+
+            val newStreamUrl = MusicService.resolveStreamUrlAsync(
+                track = currentTrack,
+                preferredQuality = newQuality.bitrateString,
+            ) ?: MusicService.resolveStreamUrl(
+                track = currentTrack,
+                preferredQuality = newQuality.bitrateString,
+            )
+
+            if (!newStreamUrl.isNullOrBlank()) {
+                val qualityLabel = when (newQuality) {
+                    MusicQuality.LOSSLESS_FLAC -> "Hi-Res FLAC"
+                    MusicQuality.HIGH_320 -> "320 KBPS"
+                    MusicQuality.MEDIUM_160 -> "160 KBPS"
+                    MusicQuality.LOW_96 -> "96 KBPS"
+                }
+                val updatedTrack = currentTrack.copy(
+                    streamUrl = newStreamUrl,
+                    isFlac = newQuality == MusicQuality.LOSSLESS_FLAC,
+                    currentQuality = qualityLabel,
+                )
+                _playbackState.update {
+                    it.copy(
+                        currentTrack = updatedTrack,
+                        isBuffering = true,
+                    )
+                }
+                audioPlayer.playUrl(newStreamUrl)
+                if (currentPos > 0) {
+                    audioPlayer.seekTo(currentPos)
+                }
+                if (!wasPlaying) {
+                    audioPlayer.pause()
+                }
+            } else {
+                _playbackState.update { it.copy(isBuffering = false) }
             }
         }
     }

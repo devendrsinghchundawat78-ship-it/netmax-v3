@@ -188,6 +188,23 @@ fun PluginsSettingsScreen(
 }
 
 @Composable
+fun PluginStoreFullScreen(
+    onBack: () -> Unit,
+) {
+    NuvioScreen(
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        stickyHeader {
+            NuvioScreenHeader(
+                title = "Plugin Store",
+                onBack = onBack,
+            )
+        }
+        pluginStoreSettingsContent()
+    }
+}
+
+@Composable
 fun AccountSettingsScreen(
     onBack: () -> Unit,
 ) {

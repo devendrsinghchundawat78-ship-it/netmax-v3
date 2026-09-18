@@ -44,18 +44,25 @@ enum class Qualities(val value: Int) {
     }
 }
 
-data class ExtractorLink(
-    var source: String = "",
-    var name: String = "",
-    var url: String = "",
-    var referer: String = "",
-    var quality: Int = Qualities.Unknown.value,
-    var type: ExtractorLinkType = ExtractorLinkType.VIDEO,
-    var headers: Map<String, String> = emptyMap(),
-    var extractorData: String? = null,
-    var isM3u8: Boolean = false,
-    var isDash: Boolean = false,
+data class AudioFile(
+    val url: String,
+    val lang: String? = null,
+)
+
+open class ExtractorLink(
+    open var source: String = "",
+    open var name: String = "",
+    open var url: String = "",
+    open var referer: String = "",
+    open var quality: Int = Qualities.Unknown.value,
+    open var headers: Map<String, String> = emptyMap(),
+    open var extractorData: String? = null,
+    open var type: ExtractorLinkType = ExtractorLinkType.VIDEO,
+    open var audioTracks: List<AudioFile> = emptyList(),
 ) {
+    open val isM3u8: Boolean get() = type == ExtractorLinkType.M3U8
+    open val isDash: Boolean get() = type == ExtractorLinkType.DASH
+
     constructor(
         source: String,
         name: String,
@@ -64,16 +71,44 @@ data class ExtractorLink(
         quality: Int,
         isM3u8: Boolean = false,
         headers: Map<String, String> = emptyMap(),
-        extractorData: String? = null
+        extractorData: String? = null,
     ) : this(
         source = source,
         name = name,
         url = url,
         referer = referer,
         quality = quality,
-        type = if (isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO,
         headers = headers,
         extractorData = extractorData,
-        isM3u8 = isM3u8
+        type = if (isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO,
     )
+
+    constructor(
+        source: String,
+        name: String,
+        url: String,
+        referer: String,
+        quality: Int,
+        type: ExtractorLinkType,
+        headers: Map<String, String> = emptyMap(),
+        extractorData: String? = null,
+    ) : this(
+        source = source,
+        name = name,
+        url = url,
+        referer = referer,
+        quality = quality,
+        headers = headers,
+        extractorData = extractorData,
+        type = type,
+    )
+
+    fun getAllHeaders(): Map<String, String> {
+        if (referer.isBlank()) {
+            return headers
+        } else if (headers.keys.none { it.equals("referer", ignoreCase = true) }) {
+            return headers + mapOf("referer" to referer)
+        }
+        return headers
+    }
 }

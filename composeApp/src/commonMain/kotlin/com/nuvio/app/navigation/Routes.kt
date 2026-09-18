@@ -59,6 +59,18 @@ data class PersonDetailRoute(
 }
 
 @Serializable
+data class YouTubeVideoDetailRoute(
+    val videoId: String,
+    val initialTitle: String = "",
+    val initialThumbnail: String = "",
+    val initialChannel: String = "",
+    val initialIs4K: Boolean = false,
+) : AppRoute {
+    override val title: String
+        get() = initialTitle.ifBlank { "YouTube Video" }
+}
+
+@Serializable
 data class EntityBrowseRoute(
     val entityKind: String,
     val entityId: Int,
@@ -99,6 +111,9 @@ data class AddonsSettingsRoute(override val title: String = "") : SettingsDestin
 
 @Serializable
 data class PluginsSettingsRoute(override val title: String = "") : SettingsDestinationRoute
+
+@Serializable
+data class PluginStoreRoute(override val title: String = "Plugin Store") : SettingsDestinationRoute
 
 @Serializable
 data class AccountSettingsRoute(override val title: String = "") : SettingsDestinationRoute

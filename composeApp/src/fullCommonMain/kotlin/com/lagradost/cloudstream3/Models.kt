@@ -265,6 +265,8 @@ interface LoadResponse {
 
         fun LoadResponse.addDuration(duration: String?) {}
         fun LoadResponse.addActors(actors: List<String>?) {}
+        fun LoadResponse.addActorNames(actors: List<String>?) {}
+        fun LoadResponse.addActorsOnly(actors: List<String>?) {}
         fun LoadResponse.addRating(rating: String?) {}
         fun LoadResponse.addPoster(url: String?) {
             posterUrl = url

@@ -102,6 +102,8 @@ import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeRepository
 import com.nuvio.app.features.home.buildAddonCatalogRefreshSignature
 import com.nuvio.app.features.home.components.shouldBlurContinueWatchingArtwork
+import com.nuvio.app.features.youtube.YouTubeRepository
+import com.nuvio.app.features.youtube.ui.YouTubeVideoDetailScreen
 import com.nuvio.app.features.library.LibraryItem
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.LibrarySection
@@ -134,6 +136,7 @@ import com.nuvio.app.features.settings.HomescreenSettingsScreen
 import com.nuvio.app.features.settings.LicensesAttributionsSettingsScreen
 import com.nuvio.app.features.settings.MetaScreenSettingsScreen
 import com.nuvio.app.features.settings.PluginsSettingsScreen
+import com.nuvio.app.features.settings.PluginStoreFullScreen
 import com.nuvio.app.features.settings.SupportersContributorsSettingsScreen
 import com.nuvio.app.features.settings.ThemeSettingsRepository
 import com.nuvio.app.features.streams.BingeGroupCacheRepository
@@ -1355,6 +1358,11 @@ internal fun MainAppContent(
                                         navController.navigate(PluginsSettingsRoute(pluginsSettingsTitle))
                                     }
                                 },
+                                onPluginStoreSettingsClick = {
+                                    if (AppFeaturePolicy.pluginsEnabled) {
+                                        navController.navigate(PluginStoreRoute("Plugin Store"))
+                                    }
+                                },
                                 onAccountSettingsClick = { navController.navigate(AccountSettingsRoute(accountSettingsTitle)) },
                                 onSupportersContributorsSettingsClick = {
                                     if (AppFeaturePolicy.supportersContributorsPageEnabled) {
@@ -1419,6 +1427,17 @@ internal fun MainAppContent(
                                         null,
                                     )
                                 },
+                                onOpenYouTubeVideo = { ytVideo ->
+                                    navController.navigate(
+                                        YouTubeVideoDetailRoute(
+                                            videoId = ytVideo.id,
+                                            initialTitle = ytVideo.title,
+                                            initialThumbnail = ytVideo.thumbnailUrl,
+                                            initialChannel = ytVideo.channelTitle,
+                                            initialIs4K = ytVideo.is4K,
+                                        )
+                                    )
+                                },
                             )
                         },
                         onBack = {
@@ -1463,6 +1482,52 @@ internal fun MainAppContent(
                 }
                 entry<EntityBrowseRoute> { route ->
                     EntityDestination(route = route, navController = navController)
+                }
+                entry<YouTubeVideoDetailRoute> { route ->
+                    YouTubeVideoDetailScreen(
+                        videoId = route.videoId,
+                        initialTitle = route.initialTitle,
+                        initialThumbnail = route.initialThumbnail,
+                        initialChannel = route.initialChannel,
+                        initialIs4K = route.initialIs4K,
+                        onBack = { navController.popBackStack() },
+                        onOpenVideo = { nextVideo ->
+                            navController.navigate(
+                                YouTubeVideoDetailRoute(
+                                    videoId = nextVideo.id,
+                                    initialTitle = nextVideo.title,
+                                    initialThumbnail = nextVideo.thumbnailUrl,
+                                    initialChannel = nextVideo.channelTitle,
+                                    initialIs4K = nextVideo.is4K,
+                                )
+                            )
+                        },
+                        onPlayVideo = { vid, chosenQuality ->
+                            coroutineScope.launch {
+                                val quality = chosenQuality ?: YouTubeRepository.extractStreamQualities(vid.id).firstOrNull()
+                                if (quality != null) {
+                                    val playerLaunch = PlayerLaunch(
+                                        profileId = activePlaybackProfileId,
+                                        title = vid.title,
+                                        sourceUrl = quality.videoUrl,
+                                        sourceAudioUrl = quality.audioUrl,
+                                        poster = vid.thumbnailUrl,
+                                        streamTitle = quality.label,
+                                        streamSubtitle = vid.channelTitle,
+                                        providerName = "YouTube",
+                                        contentType = "youtube",
+                                        videoId = "yt_${vid.id}",
+                                        parentMetaId = vid.id,
+                                        parentMetaType = "youtube",
+                                    )
+                                    val launchId = PlayerLaunchStore.put(playerLaunch)
+                                    navController.navigate(PlayerRoute(launchId = launchId, title = vid.title))
+                                } else {
+                                    NuvioToastController.show("Could not resolve video stream")
+                                }
+                            }
+                        },
+                    )
                 }
                 entry<StreamRoute> { route ->
                     StreamDestination(
@@ -1559,6 +1624,11 @@ internal fun MainAppContent(
                     entry<PluginsSettingsRoute> { route ->
                         SettingsDestination(route, navController) { onBack ->
                             PluginsSettingsScreen(onBack = onBack)
+                        }
+                    }
+                    entry<PluginStoreRoute> { route ->
+                        SettingsDestination(route, navController) { onBack ->
+                            PluginStoreFullScreen(onBack = onBack)
                         }
                     }
                 }

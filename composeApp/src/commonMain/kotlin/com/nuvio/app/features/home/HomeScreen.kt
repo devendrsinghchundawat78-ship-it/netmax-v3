@@ -6,11 +6,40 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.features.home.components.HomeHeroCategoryHeader
+import com.nuvio.app.features.home.components.HomeHeroPosterCarouselSection
+import com.nuvio.app.features.youtube.YouTubeVideoItem
+import com.nuvio.app.features.youtube.ui.YouTubeHomeScreenSection
+import org.jetbrains.compose.resources.painterResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -118,7 +147,10 @@ fun HomeScreen(
     continueWatchingDisintegrationRequest: DisintegrationRequest<String>? = null,
     onFolderClick: ((collectionId: String, folderId: String) -> Unit)? = null,
     onFirstCatalogRendered: (() -> Unit)? = null,
+    onOpenYouTubeVideo: ((YouTubeVideoItem) -> Unit)? = null,
 ) {
+    var selectedHeroCategory by rememberSaveable { mutableStateOf("Trending") }
+
     LaunchedEffect(Unit) {
         AddonRepository.initialize()
         PluginRepository.initialize()
@@ -157,6 +189,7 @@ fun HomeScreen(
 
     LaunchedEffect(scrollToTopRequests) {
         scrollToTopRequests.collect {
+            selectedHeroCategory = "Trending"
             homeListState.animateScrollToItem(0)
         }
     }
@@ -897,30 +930,63 @@ fun HomeScreen(
             Modifier
         }
 
-        NuvioScreen(
-            modifier = Modifier.fillMaxSize().then(heroStretchModifier),
-            horizontalPadding = 0.dp,
-            topPadding = if (showHeroSlot) 0.dp else null,
-            listState = homeListState,
-        ) {
-            if (showHeroSlot) {
-                item {
-                    when {
-                        showHeroSkeleton -> HomeSkeletonHero(
-                            modifier = Modifier,
-                            viewportHeight = maxHeight,
-                            mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
-                        )
+        if (selectedHeroCategory == "YT Videos") {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.nuvio.colors.background),
+            ) {
+                HomeHeroCategoryHeader(
+                    selectedCategory = selectedHeroCategory,
+                    onCategorySelected = { selectedHeroCategory = it },
+                )
+                YouTubeHomeScreenSection(
+                    onOpenVideo = { video ->
+                        onOpenYouTubeVideo?.invoke(video)
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        } else {
+            NuvioScreen(
+                modifier = Modifier.fillMaxSize().then(heroStretchModifier),
+                horizontalPadding = 0.dp,
+                topPadding = if (showHeroSlot) 0.dp else null,
+                listState = homeListState,
+            ) {
+                if (showHeroSlot) {
+                    item {
+                        when {
+                            showHeroSkeleton -> HomeSkeletonHero(
+                                modifier = Modifier,
+                                viewportHeight = maxHeight,
+                                mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                            )
 
-                        homeUiState.heroItems.isNotEmpty() -> HomeHeroSection(
-                            items = homeUiState.heroItems,
-                            modifier = Modifier,
-                            viewportHeight = maxHeight,
-                            mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
-                            listState = homeListState,
-                            stretchPx = { heroStretchState.stretchPx },
-                            onItemClick = onPosterClick,
-                        )
+                            homeUiState.heroItems.isNotEmpty() -> {
+                                if (homeSettingsUiState.heroBannerStyle == HeroBannerStyle.POSTER_CAROUSEL) {
+                                    HomeHeroPosterCarouselSection(
+                                        items = homeUiState.heroItems,
+                                        modifier = Modifier,
+                                        selectedCategory = selectedHeroCategory,
+                                        onCategorySelected = { selectedHeroCategory = it },
+                                        viewportHeight = maxHeight,
+                                        listState = homeListState,
+                                        stretchPx = { heroStretchState.stretchPx },
+                                        onItemClick = onPosterClick,
+                                    )
+                                } else {
+                                HomeHeroSection(
+                                    items = homeUiState.heroItems,
+                                    modifier = Modifier,
+                                    viewportHeight = maxHeight,
+                                    mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                                    listState = homeListState,
+                                    stretchPx = { heroStretchState.stretchPx },
+                                    onItemClick = onPosterClick,
+                                )
+                            }
+                        }
 
                         else -> HomeHeroReservedSpace(
                             modifier = Modifier,
@@ -1121,6 +1187,59 @@ fun HomeScreen(
                             }
                         }
                     }
+                }
+            }
+        }
+        }
+
+        val isHomeScrolled by remember {
+            derivedStateOf {
+                homeListState.firstVisibleItemIndex > 0 || homeListState.firstVisibleItemScrollOffset > 30
+            }
+        }
+        val topScrollBlurAlpha by animateFloatAsState(
+            targetValue = if (isHomeScrolled) 1f else 0f,
+            label = "home_top_scroll_blur_alpha",
+        )
+        if (selectedHeroCategory != "YT Videos" && topScrollBlurAlpha > 0f) {
+            val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            val tokens = MaterialTheme.nuvio
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(statusBarTop + 54.dp)
+                    .align(Alignment.TopCenter)
+                    .graphicsLayer { alpha = topScrollBlurAlpha }
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                tokens.colors.background.copy(alpha = 0.96f),
+                                tokens.colors.background.copy(alpha = 0.82f),
+                                tokens.colors.background.copy(alpha = 0f),
+                            ),
+                        ),
+                    ),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .padding(top = statusBarTop + 8.dp, start = 20.dp, end = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Image(
+                        painter = painterResource(Res.drawable.netmax_logo),
+                        contentDescription = "NetMax",
+                        modifier = Modifier.size(24.dp),
+                        contentScale = ContentScale.Fit,
+                    )
+                    Text(
+                        text = "NetMax",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
+                        ),
+                        color = Color.White,
+                    )
                 }
             }
         }

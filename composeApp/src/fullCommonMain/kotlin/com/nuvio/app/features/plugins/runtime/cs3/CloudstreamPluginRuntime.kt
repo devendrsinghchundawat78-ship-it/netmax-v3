@@ -178,6 +178,7 @@ object CloudstreamPluginRuntime {
                 },
                 callback = { link ->
                     if (link.url.isNotBlank()) {
+                        val linkHeaders = link.getAllHeaders().takeIf { it.isNotEmpty() }
                         results.add(
                             PluginRuntimeResult(
                                 title = link.name.ifBlank { api.name },
@@ -185,7 +186,7 @@ object CloudstreamPluginRuntime {
                                 url = link.url,
                                 quality = Qualities.getStringByInt(link.quality),
                                 provider = api.name,
-                                headers = link.headers.takeIf { it.isNotEmpty() },
+                                headers = linkHeaders,
                                 subtitles = null,
                             )
                         )

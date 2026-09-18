@@ -13,6 +13,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import com.nuvio.app.features.p2p.P2pStreamingState
 import com.nuvio.app.features.p2p.formatP2pMegabytes
 import com.nuvio.app.features.p2p.formatP2pSpeed
+import com.nuvio.app.features.youtube.YouTubePlayerQualityStore
 import com.nuvio.app.isIos
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
@@ -254,7 +255,12 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             }
         }
     }
-    val shouldShowQualityButton = isHlsPlaybackSource(activeSourceUrl, activeStreamType) && videoTracks.count { it.index != -1 } > 1
+    val isYouTube = contentType == "youtube" || activeVideoId?.startsWith("yt_") == true
+    val ytVideoId = activeVideoId?.removePrefix("yt_").orEmpty()
+    val youTubeQualities = androidx.compose.runtime.remember(isYouTube, ytVideoId) {
+        if (isYouTube && ytVideoId.isNotBlank()) YouTubePlayerQualityStore.getQualities(ytVideoId) else emptyList()
+    }
+    val shouldShowQualityButton = (isHlsPlaybackSource(activeSourceUrl, activeStreamType) && videoTracks.count { it.index != -1 } > 1) || (isYouTube && youTubeQualities.size > 1)
     AnimatedVisibility(
         visible = (controlsVisible || showParentalGuide) && !playerControlsLocked && !isInPip,
         enter = fadeIn(),
@@ -295,8 +301,23 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             },
             onQualityClick = if (shouldShowQualityButton) {
                 {
-                    refreshTracks()
-                    showVideoQualityModal = true
+                    if (isYouTube && youTubeQualities.isNotEmpty()) {
+                        videoTracks = youTubeQualities.mapIndexed { idx, q ->
+                            VideoQualityTrack(
+                                index = idx,
+                                id = q.label,
+                                label = q.label,
+                                height = q.height,
+                                bitrate = (q.bitrate / 1000).toInt(),
+                                isSelected = q.videoUrl == activeSourceUrl,
+                            )
+                        }
+                        selectedVideoIndex = youTubeQualities.indexOfFirst { it.videoUrl == activeSourceUrl }
+                        showVideoQualityModal = true
+                    } else {
+                        refreshTracks()
+                        showVideoQualityModal = true
+                    }
                 }
             } else null,
             onVideoSettingsClick = {
@@ -444,19 +465,38 @@ private fun BoxScope.RenderPlaybackOverlays(
 
 @Composable
 private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
+    val isYouTube = contentType == "youtube" || activeVideoId?.startsWith("yt_") == true
+    val ytVideoId = activeVideoId?.removePrefix("yt_").orEmpty()
+    val youTubeQualities = androidx.compose.runtime.remember(isYouTube, ytVideoId) {
+        if (isYouTube && ytVideoId.isNotBlank()) YouTubePlayerQualityStore.getQualities(ytVideoId) else emptyList()
+    }
+
     // Video quality modal is rendered alongside other modals but handled here to keep hosts unchanged
     VideoQualityModal(
         visible = showVideoQualityModal,
         tracks = videoTracks,
         selectedIndex = selectedVideoIndex,
         onTrackSelected = { index ->
-            selectedVideoIndex = index
-            playerController?.selectVideoTrack(index)
-            // Also refresh immediately to reflect new selection
-            scope.launch {
-                kotlinx.coroutines.delay(150)
-                refreshTracks()
-                showVideoQualityModal = false
+            if (isYouTube && youTubeQualities.isNotEmpty()) {
+                val chosen = youTubeQualities.getOrNull(index)
+                if (chosen != null) {
+                    val currentPos = playbackSnapshot.positionMs.coerceAtLeast(0L)
+                    activeInitialPositionMs = currentPos
+                    activeSourceUrl = chosen.videoUrl
+                    activeSourceAudioUrl = chosen.audioUrl
+                    activeStreamTitle = chosen.label
+                    selectedVideoIndex = index
+                    showVideoQualityModal = false
+                }
+            } else {
+                selectedVideoIndex = index
+                playerController?.selectVideoTrack(index)
+                // Also refresh immediately to reflect new selection
+                scope.launch {
+                    kotlinx.coroutines.delay(150)
+                    refreshTracks()
+                    showVideoQualityModal = false
+                }
             }
         },
         onDismiss = { showVideoQualityModal = false },

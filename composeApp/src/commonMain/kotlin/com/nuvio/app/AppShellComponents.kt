@@ -44,6 +44,7 @@ import com.nuvio.app.features.cloud.CloudLibraryItem
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.HomeScreen
 import com.nuvio.app.features.home.MetaPreview
+import com.nuvio.app.features.youtube.YouTubeVideoItem
 import com.nuvio.app.features.library.LibraryItem
 import com.nuvio.app.features.library.LibraryScreen
 import com.nuvio.app.features.library.LibrarySection
@@ -130,6 +131,7 @@ internal data class AppTabActions(
     val onDownloadsSettingsClick: () -> Unit = {},
     val onAddonsSettingsClick: () -> Unit = {},
     val onPluginsSettingsClick: () -> Unit = {},
+    val onPluginStoreSettingsClick: () -> Unit = {},
     val onAccountSettingsClick: () -> Unit = {},
     val onSupportersContributorsSettingsClick: () -> Unit = {},
     val onLicensesAttributionsSettingsClick: () -> Unit = {},
@@ -140,6 +142,7 @@ internal data class AppTabActions(
     val onRequestedSettingsPageConsumed: () -> Unit = {},
     val onInitialHomeContentRendered: () -> Unit = {},
     val onPlayMovie: ((type: String, id: String, title: String, poster: String?, background: String?, logo: String?) -> Unit)? = null,
+    val onOpenYouTubeVideo: ((YouTubeVideoItem) -> Unit)? = null,
 )
 
 @Composable
@@ -169,6 +172,7 @@ internal fun AppTabHost(
                             continueWatchingDisintegrationRequest = state.continueWatchingDisintegrationRequest,
                             onFolderClick = actions.onFolderClick,
                             onFirstCatalogRendered = actions.onInitialHomeContentRendered,
+                            onOpenYouTubeVideo = actions.onOpenYouTubeVideo,
                         )
                     }
                 }
@@ -226,6 +230,7 @@ internal fun AppTabHost(
                         onDownloadsClick = actions.onDownloadsSettingsClick,
                         onAddonsClick = actions.onAddonsSettingsClick,
                         onPluginsClick = actions.onPluginsSettingsClick,
+                        onPluginStoreClick = actions.onPluginStoreSettingsClick,
                         onAccountClick = actions.onAccountSettingsClick,
                         onSupportersContributorsClick = actions.onSupportersContributorsSettingsClick,
                         onLicensesAttributionsClick = actions.onLicensesAttributionsSettingsClick,

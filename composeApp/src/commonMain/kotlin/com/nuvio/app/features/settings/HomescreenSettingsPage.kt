@@ -33,11 +33,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioActionLabel
+import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
+import com.nuvio.app.core.ui.NuvioBottomSheetDivider
+import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioToastController
+import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.home.HeroBannerStyle
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
@@ -102,6 +112,30 @@ internal fun LazyListScope.homescreenSettingsContent(
                     isTablet = isTablet,
                     onCheckedChange = HomeCatalogSettingsRepository::setHeroEnabled,
                 )
+                if (heroEnabled) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    var showHeroStyleSheet by remember { mutableStateOf(false) }
+                    val homeCatalogSettings by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
+                    SettingsNavigationRow(
+                        title = "Hero Banner Style",
+                        description = when (homeCatalogSettings.heroBannerStyle) {
+                            HeroBannerStyle.POSTER_CAROUSEL -> "Poster Carousel (Default)"
+                            HeroBannerStyle.CLASSIC_WIDE -> "Classic Landscape"
+                        },
+                        isTablet = isTablet,
+                        onClick = { showHeroStyleSheet = true },
+                    )
+                    if (showHeroStyleSheet) {
+                        HeroBannerStyleBottomSheet(
+                            selectedStyle = homeCatalogSettings.heroBannerStyle,
+                            onStyleSelected = {
+                                HomeCatalogSettingsRepository.setHeroBannerStyle(it)
+                                showHeroStyleSheet = false
+                            },
+                            onDismiss = { showHeroStyleSheet = false },
+                        )
+                    }
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
                     title = stringResource(Res.string.layout_catalog_type),
@@ -370,6 +404,59 @@ private fun HomescreenCatalogList(
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HeroBannerStyleBottomSheet(
+    selectedStyle: HeroBannerStyle,
+    onStyleSelected: (HeroBannerStyle) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val coroutineScope = rememberCoroutineScope()
+
+    NuvioModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            Text(
+                text = "Hero Banner Style",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+            )
+            HeroBannerStyle.entries.forEachIndexed { index, style ->
+                if (index > 0) NuvioBottomSheetDivider()
+                val isSelected = style == selectedStyle
+                val title = when (style) {
+                    HeroBannerStyle.POSTER_CAROUSEL -> "Poster Carousel (Default)"
+                    HeroBannerStyle.CLASSIC_WIDE -> "Classic Landscape"
+                }
+                val description = when (style) {
+                    HeroBannerStyle.POSTER_CAROUSEL -> "Cinematic portrait poster carousel with dynamic bloom"
+                    HeroBannerStyle.CLASSIC_WIDE -> "Full-width landscape backdrop banner"
+                }
+                NuvioBottomSheetActionRow(
+                    title = title,
+                    description = description,
+                    selected = isSelected,
+                    onClick = {
+                        dismissNuvioBottomSheet(coroutineScope, sheetState) {
+                            onStyleSelected(style)
+                        }
+                    },
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

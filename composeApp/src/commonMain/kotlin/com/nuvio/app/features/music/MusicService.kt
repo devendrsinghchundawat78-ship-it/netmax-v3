@@ -79,6 +79,25 @@ object MusicService {
         tracks
     }
 
+    suspend fun resolveStreamUrlAsync(track: MusicTrack, preferredQuality: String = "320kbps"): String? {
+        if (!track.localFilePath.isNullOrBlank()) {
+            return track.localFilePath
+        }
+
+        val isFlacRequested = preferredQuality.equals("flac", ignoreCase = true) ||
+            preferredQuality.contains("lossless", ignoreCase = true) ||
+            track.isFlac
+
+        if (isFlacRequested) {
+            val flacStreamUrl = ClashFlacService.resolveFlacStream(track)
+            if (!flacStreamUrl.isNullOrBlank()) {
+                return flacStreamUrl
+            }
+        }
+
+        return resolveStreamUrl(track, preferredQuality)
+    }
+
     fun resolveStreamUrl(track: MusicTrack, preferredQuality: String = "320kbps"): String? {
         if (!track.localFilePath.isNullOrBlank()) {
             return track.localFilePath

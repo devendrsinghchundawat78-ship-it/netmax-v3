@@ -76,7 +76,10 @@ import com.nuvio.app.core.ui.liquidGlass
 import com.nuvio.app.features.music.MusicDownloadManager
 import com.nuvio.app.features.music.MusicLibraryRepository
 import com.nuvio.app.features.music.MusicPlaybackController
+import com.nuvio.app.features.music.MusicQuality
 import com.nuvio.app.features.music.MusicRepeatMode
+import com.nuvio.app.features.music.MusicSettingsRepository
+import androidx.compose.ui.window.Dialog
 import dev.chrisbanes.haze.HazeState
 
 @Composable
@@ -95,8 +98,21 @@ fun MusicFullPlayerSheet(
     var showQueue by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
     var showEqualizer by remember { mutableStateOf(false) }
+    var showQualityDialog by remember { mutableStateOf(false) }
     var isDraggingSlider by remember { mutableStateOf(false) }
     var dragPositionMs by remember { mutableFloatStateOf(0f) }
+
+    val musicSettings by MusicSettingsRepository.settings.collectAsStateWithLifecycle()
+    val currentQuality = MusicQuality.fromBitrate(musicSettings.streamingQuality)
+    val isFlacActive = track?.isFlac == true || currentQuality == MusicQuality.LOSSLESS_FLAC
+    val badgeLabel = when {
+        track?.isDownloaded == true -> "OFFLINE HQ"
+        isFlacActive -> "FLAC • LOSSLESS"
+        currentQuality == MusicQuality.HIGH_320 -> "320 KBPS • HQ"
+        currentQuality == MusicQuality.MEDIUM_160 -> "160 KBPS • STANDARD"
+        currentQuality == MusicQuality.LOW_96 -> "96 KBPS • DATA SAVER"
+        else -> "320 KBPS • AAC"
+    }
 
     AnimatedVisibility(
         visible = state.isFullPlayerVisible && track != null,
@@ -319,7 +335,7 @@ fun MusicFullPlayerSheet(
                             }
                         }
 
-                        // Quality Badge
+                        // Quality Badge (Interactive Selector)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -329,19 +345,42 @@ fun MusicFullPlayerSheet(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isFlacActive) Color(0xFFE0A96D).copy(alpha = 0.22f)
+                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                    )
+                                    .clickable { showQualityDialog = true }
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
                             ) {
-                                Text(
-                                    text = if (track.isDownloaded) "OFFLINE HQ" else "320 KBPS • AAC",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 1.sp,
-                                    ),
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                ) {
+                                    if (isFlacActive) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.GraphicEq,
+                                            contentDescription = null,
+                                            tint = Color(0xFFE0A96D),
+                                            modifier = Modifier.size(13.dp),
+                                        )
+                                    }
+                                    Text(
+                                        text = badgeLabel,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 1.sp,
+                                        ),
+                                        color = if (isFlacActive) Color(0xFFE0A96D) else MaterialTheme.colorScheme.primary,
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                                        contentDescription = "Change Quality",
+                                        tint = if (isFlacActive) Color(0xFFE0A96D) else MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
                             }
                         }
 
@@ -567,6 +606,136 @@ fun MusicFullPlayerSheet(
                                         )
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showQualityDialog) {
+        Dialog(onDismissRequest = { showQualityDialog = false }) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp)),
+                color = Color(0xFF141620),
+                tonalElevation = 6.dp,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column {
+                            Text(
+                                text = "Audio Quality",
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "Select streaming quality for playback",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                            )
+                        }
+                        IconButton(
+                            onClick = { showQualityDialog = false },
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Close",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+
+                    MusicQuality.entries.forEach { qualityOption ->
+                        val isSelected = currentQuality == qualityOption
+                        val isFlacOpt = qualityOption == MusicQuality.LOSSLESS_FLAC
+                        val optBg = if (isSelected) {
+                            if (isFlacOpt) Color(0xFFE0A96D).copy(alpha = 0.18f)
+                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(optBg)
+                                .clickable {
+                                    MusicPlaybackController.changeQuality(qualityOption)
+                                    showQualityDialog = false
+                                }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Text(
+                                        text = qualityOption.label,
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        ),
+                                        color = if (isSelected) {
+                                            if (isFlacOpt) Color(0xFFE0A96D) else MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
+                                    )
+                                    if (isFlacOpt) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(Color(0xFFE0A96D))
+                                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                                        ) {
+                                            Text(
+                                                text = "STUDIO",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    color = Color.Black,
+                                                ),
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = when (qualityOption) {
+                                        MusicQuality.LOSSLESS_FLAC -> "ClashFLAC Studio Master up to 24-bit / 192kHz"
+                                        MusicQuality.HIGH_320 -> "Crisp high-definition 320 kbps audio"
+                                        MusicQuality.MEDIUM_160 -> "Standard balanced quality"
+                                        MusicQuality.LOW_96 -> "Low data consumption saver mode"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                )
+                            }
+
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Rounded.CheckCircle,
+                                    contentDescription = "Selected",
+                                    tint = if (isFlacOpt) Color(0xFFE0A96D) else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp),
+                                )
                             }
                         }
                     }

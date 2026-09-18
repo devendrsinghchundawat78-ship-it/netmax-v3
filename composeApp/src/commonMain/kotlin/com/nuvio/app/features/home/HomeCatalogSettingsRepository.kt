@@ -31,8 +31,15 @@ data class HomeCatalogSettingsItem(
         get() = customTitle.ifBlank { defaultTitle }
 }
 
+@Serializable
+enum class HeroBannerStyle {
+    POSTER_CAROUSEL,
+    CLASSIC_WIDE,
+}
+
 data class HomeCatalogSettingsUiState(
     val heroEnabled: Boolean = true,
+    val heroBannerStyle: HeroBannerStyle = HeroBannerStyle.POSTER_CAROUSEL,
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
     val items: List<HomeCatalogSettingsItem> = emptyList(),
@@ -40,6 +47,8 @@ data class HomeCatalogSettingsUiState(
     val signature: String
         get() = buildString {
             append(heroEnabled)
+            append('|')
+            append(heroBannerStyle.name)
             append('|')
             append(showCatalogType)
             append('|')
@@ -62,6 +71,7 @@ internal data class HomeCatalogPreference(
 
 internal data class HomeCatalogSettingsSnapshot(
     val heroEnabled: Boolean,
+    val heroBannerStyle: HeroBannerStyle = HeroBannerStyle.POSTER_CAROUSEL,
     val showCatalogType: Boolean,
     val hideUnreleasedContent: Boolean,
     val preferences: Map<String, HomeCatalogPreference>,
@@ -79,6 +89,7 @@ private data class StoredHomeCatalogPreference(
 @Serializable
 private data class StoredHomeCatalogSettingsPayload(
     val heroEnabled: Boolean = true,
+    val heroBannerStyle: HeroBannerStyle = HeroBannerStyle.POSTER_CAROUSEL,
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
     val items: List<StoredHomeCatalogPreference> = emptyList(),
@@ -105,6 +116,7 @@ object HomeCatalogSettingsRepository {
             preferencesRef.value = value
         }
     private var heroEnabled = true
+    private var heroBannerStyle = HeroBannerStyle.POSTER_CAROUSEL
     private var showCatalogType = true
     private var hideUnreleasedContent = false
 
@@ -112,6 +124,7 @@ object HomeCatalogSettingsRepository {
         hasLoaded = false
         preferences = emptyMap()
         heroEnabled = true
+        heroBannerStyle = HeroBannerStyle.POSTER_CAROUSEL
         showCatalogType = true
         hideUnreleasedContent = false
         definitions = emptyList()
@@ -125,6 +138,7 @@ object HomeCatalogSettingsRepository {
         collectionDefinitions = emptyList()
         preferences = emptyMap()
         heroEnabled = true
+        heroBannerStyle = HeroBannerStyle.POSTER_CAROUSEL
         showCatalogType = true
         hideUnreleasedContent = false
         _uiState.value = HomeCatalogSettingsUiState()
@@ -158,6 +172,7 @@ object HomeCatalogSettingsRepository {
         ensureLoaded()
         return HomeCatalogSettingsSnapshot(
             heroEnabled = heroEnabled,
+            heroBannerStyle = heroBannerStyle,
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
             preferences = preferences.mapValues { (_, value) ->
@@ -174,6 +189,15 @@ object HomeCatalogSettingsRepository {
     fun setHeroEnabled(enabled: Boolean) {
         ensureLoaded()
         heroEnabled = enabled
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+    }
+
+    fun setHeroBannerStyle(style: HeroBannerStyle) {
+        ensureLoaded()
+        if (heroBannerStyle == style) return
+        heroBannerStyle = style
         publish()
         persist()
         HomeRepository.applyCurrentSettings()
@@ -226,6 +250,7 @@ object HomeCatalogSettingsRepository {
     fun resetToDefaults() {
         ensureLoaded()
         heroEnabled = true
+        heroBannerStyle = HeroBannerStyle.POSTER_CAROUSEL
         showCatalogType = true
         hideUnreleasedContent = false
         preferences = emptyMap()
@@ -277,6 +302,7 @@ object HomeCatalogSettingsRepository {
 
         if (parsedPayload != null) {
             heroEnabled = parsedPayload.heroEnabled
+            heroBannerStyle = parsedPayload.heroBannerStyle
             showCatalogType = parsedPayload.showCatalogType
             hideUnreleasedContent = parsedPayload.hideUnreleasedContent
             preferences = parsedPayload.items.associateBy { it.key }
@@ -377,6 +403,7 @@ object HomeCatalogSettingsRepository {
 
         _uiState.value = HomeCatalogSettingsUiState(
             heroEnabled = heroEnabled,
+            heroBannerStyle = heroBannerStyle,
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
             items = items,
@@ -388,6 +415,7 @@ object HomeCatalogSettingsRepository {
             json.encodeToString(
                 StoredHomeCatalogSettingsPayload(
                     heroEnabled = heroEnabled,
+                    heroBannerStyle = heroBannerStyle,
                     showCatalogType = showCatalogType,
                     hideUnreleasedContent = hideUnreleasedContent,
                     items = preferences.values.sortedBy { it.order },
