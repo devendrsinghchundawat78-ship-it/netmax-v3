@@ -81,6 +81,7 @@ open class ExtractorLink(
         headers = headers,
         extractorData = extractorData,
         type = if (isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO,
+        audioTracks = emptyList(),
     )
 
     constructor(
@@ -101,6 +102,7 @@ open class ExtractorLink(
         headers = headers,
         extractorData = extractorData,
         type = type,
+        audioTracks = emptyList(),
     )
 
     fun getAllHeaders(): Map<String, String> {

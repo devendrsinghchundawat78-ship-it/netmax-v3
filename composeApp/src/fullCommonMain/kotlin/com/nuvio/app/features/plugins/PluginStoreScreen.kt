@@ -134,7 +134,7 @@ fun PluginStorePageContent(
     var selectedFilter by rememberSaveable { mutableStateOf(PluginStoreFilter.ALL) }
 
     var configuringScraper by remember { mutableStateOf<PluginScraper?>(null) }
-    var configuringLayout by remember { mutableStateOf<com.nuvio.app.features.plugins.runtime.PluginSettingsLayout?>(null) }
+    var configuringLayout by remember { mutableStateOf<String?>(null) }
 
     val allScrapers = uiState.scrapers
     val installedCount = allScrapers.count { it.enabled }
@@ -319,8 +319,9 @@ fun PluginStorePageContent(
     configuringScraper?.let { scraper ->
         configuringLayout?.let { layout ->
             PluginSettingsDialog(
-                scraper = scraper,
-                layout = layout,
+                scraperId = scraper.id,
+                scraperName = scraper.name,
+                layoutJson = layout,
                 onDismiss = {
                     configuringScraper = null
                     configuringLayout = null

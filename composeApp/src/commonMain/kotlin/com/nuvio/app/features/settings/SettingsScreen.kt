@@ -507,6 +507,7 @@ fun SettingsScreen(
                 onContinueWatchingClick = openContinueWatching,
                 onAddonsClick = openAddons,
                 onPluginsClick = openPlugins,
+                onPluginStoreClick = openPluginStore,
                 onDownloadsClick = onDownloadsClick,
                 onAccountClick = openAccount,
                 onSupportersContributorsClick = openSupportersContributors,
@@ -584,6 +585,7 @@ private fun MobileSettingsScreen(
     onContinueWatchingClick: () -> Unit = {},
     onAddonsClick: () -> Unit = {},
     onPluginsClick: () -> Unit = {},
+    onPluginStoreClick: () -> Unit = {},
     onDownloadsClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
     onNetmaxAiClick: (() -> Unit)? = null,
@@ -643,7 +645,7 @@ private fun MobileSettingsScreen(
                     }
                     SettingsPage.PluginStore -> {
                         if (AppFeaturePolicy.pluginsEnabled) {
-                            openPluginStore()
+                            onPluginStoreClick()
                         }
                     }
                     SettingsPage.Homescreen -> onHomescreenClick()
@@ -816,7 +818,7 @@ private fun MobileSettingsScreen(
                     showPluginsEntry = AppFeaturePolicy.pluginsEnabled,
                     onAddonsClick = onAddonsClick,
                     onPluginsClick = onPluginsClick,
-                    onPluginStoreClick = openPluginStore,
+                    onPluginStoreClick = onPluginStoreClick,
                 )
                 SettingsPage.Addons -> addonsSettingsContent()
                 SettingsPage.Plugins -> if (AppFeaturePolicy.pluginsEnabled) pluginsSettingsContent() else addonsSettingsContent()

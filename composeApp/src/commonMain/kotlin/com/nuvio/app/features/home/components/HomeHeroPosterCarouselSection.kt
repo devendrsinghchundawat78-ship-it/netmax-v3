@@ -274,7 +274,7 @@ fun HomeHeroPosterCarouselSection(
                 val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction).absoluteValue.coerceIn(0f, 1f)
                 val scale = lerp(1f, 0.86f, pageOffset)
                 val alpha = lerp(1f, 0.55f, pageOffset)
-                val elevation = ((1f - pageOffset) * 14.dp).coerceAtLeast(0.dp)
+                val elevation = (14.dp * (1f - pageOffset)).coerceAtLeast(0.dp)
 
                 Box(
                     modifier = Modifier

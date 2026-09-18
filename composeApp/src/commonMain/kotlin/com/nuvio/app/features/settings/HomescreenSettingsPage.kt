@@ -38,6 +38,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.rounded.Check
+import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
@@ -441,17 +444,22 @@ private fun HeroBannerStyleBottomSheet(
                     HeroBannerStyle.POSTER_CAROUSEL -> "Poster Carousel (Default)"
                     HeroBannerStyle.CLASSIC_WIDE -> "Classic Landscape"
                 }
-                val description = when (style) {
-                    HeroBannerStyle.POSTER_CAROUSEL -> "Cinematic portrait poster carousel with dynamic bloom"
-                    HeroBannerStyle.CLASSIC_WIDE -> "Full-width landscape backdrop banner"
-                }
                 NuvioBottomSheetActionRow(
                     title = title,
-                    description = description,
-                    selected = isSelected,
+                    trailingContent = {
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    },
                     onClick = {
-                        dismissNuvioBottomSheet(coroutineScope, sheetState) {
-                            onStyleSelected(style)
+                        coroutineScope.launch {
+                            dismissNuvioBottomSheet(sheetState) {
+                                onStyleSelected(style)
+                            }
                         }
                     },
                 )

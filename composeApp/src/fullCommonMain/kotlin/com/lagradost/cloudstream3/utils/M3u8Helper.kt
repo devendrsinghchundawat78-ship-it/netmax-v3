@@ -19,7 +19,6 @@ class M3u8Helper {
                     quality = quality ?: Qualities.Unknown.value,
                     type = ExtractorLinkType.M3U8,
                     headers = headers,
-                    isM3u8 = true
                 )
             )
         }
