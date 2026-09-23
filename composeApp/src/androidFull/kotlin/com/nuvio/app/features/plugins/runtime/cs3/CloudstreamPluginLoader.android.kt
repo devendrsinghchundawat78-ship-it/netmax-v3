@@ -245,11 +245,20 @@ object CloudstreamPluginLoader {
                 method.parameterTypes.size == 1 &&
                 isContextCompatible(method.parameterTypes[0])
         }
-        if (loadWithContext != null && ctx != null) {
-            val invoked = runCatching { loadWithContext.invoke(instance, ctx) }
-                .onFailure { log.w(it) { "Plugin load(Context) failed, falling back to load()" } }
-                .isSuccess
-            if (invoked) return
+        if (loadWithContext != null) {
+            val targetCtx = ctx ?: runCatching {
+                java.lang.reflect.Proxy.newProxyInstance(
+                    cls.classLoader,
+                    arrayOf(Class.forName("android.content.Context"))
+                ) { _, _, _ -> null }
+            }.getOrNull()
+
+            if (targetCtx != null) {
+                val invoked = runCatching { loadWithContext.invoke(instance, targetCtx) }
+                    .onFailure { log.w(it) { "Plugin load(Context) failed, falling back to load()" } }
+                    .isSuccess
+                if (invoked && instance.registeredApis.isNotEmpty()) return
+            }
         }
         runCatching { instance.load() }
     }

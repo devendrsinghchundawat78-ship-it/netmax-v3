@@ -31,6 +31,7 @@ data class YouTubeFeedCategory(
     val id: String,
     val label: String,
     val searchQuery: String,
+    val queryVariations: List<String> = emptyList(),
 )
 
 object YouTubePlayerQualityStore {

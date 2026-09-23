@@ -1,5 +1,7 @@
 package com.nuvio.app.features.netmax
 
+import com.nuvio.app.features.downloads.DownloadsClock
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -141,7 +143,7 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         val text = queryText.trim()
         if (text.isBlank() || busy) return
         input = ""
-        val userMsgId = "msg_${System.currentTimeMillis()}"
+        val userMsgId = "msg_${DownloadsClock.nowEpochMs()}"
         messages.add(ChatLine(id = userMsgId, role = "user", text = text))
         busy = true
         error = null
@@ -153,7 +155,7 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     remaining = it.usage.remaining
                     messages.add(
                         ChatLine(
-                            id = "reply_${System.currentTimeMillis()}",
+                            id = "reply_${DownloadsClock.nowEpochMs()}",
                             role = "assistant",
                             text = it.reply,
                             action = it.pendingAction,
@@ -568,7 +570,7 @@ fun NetmaxAiScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                                                                          }
                                                                          messages.add(
                                                                              ChatLine(
-                                                                                 id = "action_res_${System.currentTimeMillis()}",
+                                                                                 id = "action_res_${DownloadsClock.nowEpochMs()}",
                                                                                  role = "assistant",
                                                                                  text = replyText,
                                                                              )

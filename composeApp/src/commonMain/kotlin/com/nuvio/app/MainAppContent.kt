@@ -1428,6 +1428,11 @@ internal fun MainAppContent(
                                     )
                                 },
                                 onOpenYouTubeVideo = { ytVideo ->
+                                    coroutineScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+                                        if (com.nuvio.app.features.youtube.YouTubePlayerQualityStore.getQualities(ytVideo.id).isEmpty()) {
+                                            runCatching { YouTubeRepository.extractStreamQualities(ytVideo.id) }
+                                        }
+                                    }
                                     navController.navigate(
                                         YouTubeVideoDetailRoute(
                                             videoId = ytVideo.id,
@@ -1504,7 +1509,15 @@ internal fun MainAppContent(
                         },
                         onPlayVideo = { vid, chosenQuality ->
                             coroutineScope.launch {
-                                val quality = chosenQuality ?: YouTubeRepository.extractStreamQualities(vid.id).firstOrNull()
+                                val quality = chosenQuality ?: run {
+                                    val list = com.nuvio.app.features.youtube.YouTubePlayerQualityStore.getQualities(vid.id).ifEmpty {
+                                        YouTubeRepository.extractStreamQualities(vid.id)
+                                    }
+                                    list.firstOrNull { it.height == 1080 }
+                                        ?: list.firstOrNull { it.height == 720 }
+                                        ?: list.firstOrNull { it.height <= 1080 }
+                                        ?: list.firstOrNull()
+                                }
                                 if (quality != null) {
                                     val playerLaunch = PlayerLaunch(
                                         profileId = activePlaybackProfileId,

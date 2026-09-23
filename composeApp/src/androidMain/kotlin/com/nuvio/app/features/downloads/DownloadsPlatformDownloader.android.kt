@@ -17,24 +17,75 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
+import com.nuvio.app.core.network.IPv4FirstDns
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URI
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import javax.net.ssl.HostnameVerifier
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 private const val DEFAULT_DOWNLOAD_USER_AGENT = "Mozilla/5.0 (Android) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36"
 
-private val downloadHttpClient = OkHttpClient.Builder()
-    .connectTimeout(60, TimeUnit.SECONDS)
-    .readTimeout(60, TimeUnit.SECONDS)
-    .writeTimeout(60, TimeUnit.SECONDS)
-    .followRedirects(true)
-    .followSslRedirects(true)
-    .build()
+private class PreservedDownloadHeaders(val headers: Map<String, String>)
+
+private val downloadTrustAllManager = object : X509TrustManager {
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
+    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
+    override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+}
+
+private val downloadHostnameVerifier = HostnameVerifier { _, _ -> true }
+
+private val downloadSslContext: SSLContext by lazy {
+    SSLContext.getInstance("TLS").apply {
+        init(null, arrayOf<TrustManager>(downloadTrustAllManager), SecureRandom())
+    }
+}
+
+private val downloadHttpClient: OkHttpClient by lazy {
+    OkHttpClient.Builder()
+        .dns(IPv4FirstDns())
+        .sslSocketFactory(downloadSslContext.socketFactory, downloadTrustAllManager)
+        .hostnameVerifier(downloadHostnameVerifier)
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .retryOnConnectionFailure(true)
+        .addNetworkInterceptor { chain ->
+            val request = chain.request()
+            val preserved = request.tag(PreservedDownloadHeaders::class.java)
+            var builder: Request.Builder? = null
+            if (preserved != null && preserved.headers.isNotEmpty()) {
+                preserved.headers.forEach { (key, value) ->
+                    if (request.header(key) == null) {
+                        if (builder == null) builder = request.newBuilder()
+                        builder!!.header(key, value)
+                    }
+                }
+            }
+            if (request.header("User-Agent").isNullOrBlank()) {
+                if (builder == null) builder = request.newBuilder()
+                builder!!.header("User-Agent", DEFAULT_DOWNLOAD_USER_AGENT)
+            }
+            if (builder != null) {
+                chain.proceed(builder!!.build())
+            } else {
+                chain.proceed(request)
+            }
+        }
+        .build()
+}
 
 internal actual object DownloadsPlatformDownloader {
     private var appContext: Context? = null
@@ -72,6 +123,7 @@ internal actual object DownloadsPlatformDownloader {
                         destination = destination,
                         tempFile = tempFile,
                         headers = buildDownloadHeaders(request.sourceHeaders),
+                        sourceHeaders = request.sourceHeaders,
                         onProgress = onProgress,
                         onSuccess = onSuccess,
                         registerCall = { call = it },
@@ -99,6 +151,7 @@ internal actual object DownloadsPlatformDownloader {
                     if (rangeStart != null && rangeStart > 0L) {
                         requestBuilder.header("Range", "bytes=$rangeStart-")
                     }
+                    requestBuilder.tag(PreservedDownloadHeaders::class.java, PreservedDownloadHeaders(request.sourceHeaders))
                     return requestBuilder.get().build()
                 }
 
@@ -363,6 +416,7 @@ private suspend fun CoroutineScope.downloadHlsPlaylist(
     destination: File,
     tempFile: File,
     headers: Headers,
+    sourceHeaders: Map<String, String> = emptyMap(),
     onProgress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
     onSuccess: (localFileUri: String, totalBytes: Long?) -> Unit,
     registerCall: (Call?) -> Unit,
@@ -373,7 +427,7 @@ private suspend fun CoroutineScope.downloadHlsPlaylist(
         tempFile.delete()
     }
 
-    val playlistText = fetchHlsText(playlistUrl, headers, registerCall)
+    val playlistText = fetchHlsText(playlistUrl, headers, sourceHeaders, registerCall)
         ?: error(runBlocking { getString(Res.string.downloads_error_hls_playlist) })
 
     var mediaPlaylistUrl = playlistUrl
@@ -382,7 +436,7 @@ private suspend fun CoroutineScope.downloadHlsPlaylist(
     if (variants.isNotEmpty()) {
         val best = variants.maxByOrNull { it.bandwidth } ?: variants.first()
         mediaPlaylistUrl = best.uri
-        mediaPlaylistText = fetchHlsText(best.uri, headers, registerCall)
+        mediaPlaylistText = fetchHlsText(best.uri, headers, sourceHeaders, registerCall)
             ?: error(runBlocking { getString(Res.string.downloads_error_hls_playlist) })
     }
 
@@ -408,7 +462,7 @@ private suspend fun CoroutineScope.downloadHlsPlaylist(
     FileOutputStream(tempFile, false).use { output ->
         parsed.initSegmentUri?.let { initUri ->
             ensureActive()
-            val bytes = fetchHlsBytes(initUri, headers, null, null, registerCall)
+            val bytes = fetchHlsBytes(initUri, headers, null, null, sourceHeaders, registerCall)
                 ?: error(runBlocking { getString(Res.string.downloads_error_hls_playlist) })
             output.write(bytes)
             downloadedBytes += bytes.size.toLong()
@@ -420,13 +474,13 @@ private suspend fun CoroutineScope.downloadHlsPlaylist(
             if (key != null && key.method != "NONE" && key.method != "AES-128") {
                 error(runBlocking { getString(Res.string.downloads_error_hls_encrypted) })
             }
-            var bytes = fetchHlsBytes(segment.uri, headers, segment.rangeStart, segment.rangeEndInclusive(), registerCall)
+            var bytes = fetchHlsBytes(segment.uri, headers, segment.rangeStart, segment.rangeEndInclusive(), sourceHeaders, registerCall)
                 ?: error(runBlocking { getString(Res.string.downloads_error_hls_playlist) })
             if (key != null && key.method == "AES-128") {
                 val keyUri = key.uri
                     ?: error(runBlocking { getString(Res.string.downloads_error_hls_encrypted) })
                 val keyBytes = keyCache.getOrPut(keyUri) {
-                    fetchHlsBytes(keyUri, headers, null, null, registerCall)?.takeIf { it.size == 16 }
+                    fetchHlsBytes(keyUri, headers, null, null, sourceHeaders, registerCall)?.takeIf { it.size == 16 }
                         ?: error(runBlocking { getString(Res.string.downloads_error_hls_encrypted) })
                 }
                 if (bytes.size % 16 != 0) {
@@ -462,9 +516,14 @@ private suspend fun CoroutineScope.downloadHlsPlaylist(
 private fun fetchHlsText(
     url: String,
     headers: Headers,
+    sourceHeaders: Map<String, String> = emptyMap(),
     registerCall: (Call?) -> Unit,
 ): String? {
-    val call = downloadHttpClient.newCall(Request.Builder().url(url).headers(headers).get().build())
+    val reqBuilder = Request.Builder().url(url).headers(headers)
+    if (sourceHeaders.isNotEmpty()) {
+        reqBuilder.tag(PreservedDownloadHeaders::class.java, PreservedDownloadHeaders(sourceHeaders))
+    }
+    val call = downloadHttpClient.newCall(reqBuilder.get().build())
     registerCall(call)
     call.execute().use { response ->
         if (!response.isSuccessful) return null
@@ -479,12 +538,16 @@ private fun fetchHlsBytes(
     headers: Headers,
     rangeStart: Long?,
     rangeEndInclusive: Long?,
+    sourceHeaders: Map<String, String> = emptyMap(),
     registerCall: (Call?) -> Unit,
 ): ByteArray? {
     val builder = Request.Builder().url(url).headers(headers)
     if (rangeStart != null && rangeStart >= 0L) {
         val end = rangeEndInclusive?.let { "-$it" } ?: "-"
         builder.header("Range", "bytes=$rangeStart$end")
+    }
+    if (sourceHeaders.isNotEmpty()) {
+        builder.tag(PreservedDownloadHeaders::class.java, PreservedDownloadHeaders(sourceHeaders))
     }
     val call = downloadHttpClient.newCall(builder.get().build())
     registerCall(call)

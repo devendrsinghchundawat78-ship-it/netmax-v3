@@ -66,7 +66,7 @@ object QuickWatchFeedRepository {
                 seenVideoIds.clear()
                 seenVideoIds.addAll(toRetain)
             }
-            scope.launch(Dispatchers.IO) {
+            scope.launch(Dispatchers.Default) {
                 runCatching { QuickWatchSettingsStorage.saveSeenVideoIds(seenVideoIds) }
             }
         }

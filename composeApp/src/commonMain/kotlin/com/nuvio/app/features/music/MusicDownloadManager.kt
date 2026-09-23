@@ -1,5 +1,6 @@
 package com.nuvio.app.features.music
 
+import com.nuvio.app.features.downloads.DownloadsClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -78,7 +79,7 @@ object MusicDownloadManager {
                 val downloadedTrack = track.copy(
                     localFilePath = localPath,
                     isDownloaded = true,
-                    addedAtMs = System.currentTimeMillis()
+                    addedAtMs = DownloadsClock.nowEpochMs()
                 )
                 val updated = listOf(downloadedTrack) + _downloadedTracks.value.filterNot { it.id == track.id }
                 _downloadedTracks.value = updated

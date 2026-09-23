@@ -3,6 +3,8 @@ package com.nuvio.app.features.quickwatch
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpPostJsonWithHeaders
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -30,14 +32,14 @@ object MovieShortsResolver {
     private val json = Json { ignoreUnknownKeys = true }
     private val videoIdRegex = Regex("^[a-zA-Z0-9_-]{11}$")
     private val cache = mutableMapOf<String, List<MovieShortVideo>>()
+    private val mutex = Mutex()
 
     suspend fun fetchShortsForMovie(movieTitle: String, limit: Int = 3): List<MovieShortVideo> = withContext(Dispatchers.Default) {
         val cleanTitle = movieTitle.trim()
         if (cleanTitle.isBlank()) return@withContext emptyList()
 
-        synchronized(cache) {
-            cache[cleanTitle]?.let { return@withContext it }
-        }
+        val cached = mutex.withLock { cache[cleanTitle] }
+        if (cached != null) return@withContext cached
 
         val query = "$cleanTitle movie #shorts"
         val requestBody = buildJsonObject {
@@ -72,7 +74,7 @@ object MovieShortsResolver {
             collectVideoCandidates(root, extracted, seenIds)
 
             val results = extracted.take(limit)
-            synchronized(cache) {
+            mutex.withLock {
                 if (cache.size > 80) {
                     val firstKey = cache.keys.firstOrNull()
                     if (firstKey != null) cache.remove(firstKey)

@@ -100,11 +100,20 @@ fun YouTubeVideoDetailScreen(
         )
     }
 
+    val findPreferredQuality = remember {
+        { list: List<YouTubeStreamQuality> ->
+            list.firstOrNull { it.height == 1080 }
+                ?: list.firstOrNull { it.height == 720 }
+                ?: list.firstOrNull { it.height <= 1080 }
+                ?: list.firstOrNull()
+        }
+    }
+
     var streamQualities by remember(videoId) {
         mutableStateOf(YouTubePlayerQualityStore.getQualities(videoId))
     }
     var selectedQuality by remember(videoId) {
-        mutableStateOf(streamQualities.firstOrNull())
+        mutableStateOf(findPreferredQuality(streamQualities))
     }
     var isLoadingQualities by remember(videoId) {
         mutableStateOf(streamQualities.isEmpty())
@@ -122,7 +131,9 @@ fun YouTubeVideoDetailScreen(
             try {
                 val extracted = YouTubeRepository.extractStreamQualities(videoId)
                 streamQualities = extracted
-                selectedQuality = extracted.firstOrNull()
+                if (selectedQuality == null) {
+                    selectedQuality = findPreferredQuality(extracted)
+                }
                 // Update 4K status if 4K stream is detected
                 if (extracted.any { it.height >= 2160 }) {
                     video = video.copy(is4K = true)

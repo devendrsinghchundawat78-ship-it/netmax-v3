@@ -16,4 +16,5 @@ object APIHolder {
 
     fun getCaptchaToken(url: String, key: String): String? = null
     fun getCaptchaToken(url: String, key: String, referer: String? = null): String? = null
+    suspend fun getCaptchaToken(url: String, key: String, referer: String? = null, timeout: Long = 0L): String? = null
 }

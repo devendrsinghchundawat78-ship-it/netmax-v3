@@ -263,6 +263,18 @@ interface LoadResponse {
             this.trailerUrl = trailerUrl
         }
 
+        suspend fun LoadResponse.addTrailer(trailers: List<String>?, referer: String? = null, addRaw: Boolean = false) {
+            this.trailerUrl = trailers?.firstOrNull { it.isNotBlank() }
+        }
+
+        fun LoadResponse.addTrailer(trailerUrl: String?) {
+            this.trailerUrl = trailerUrl
+        }
+
+        fun LoadResponse.addTrailer(trailers: List<String>?) {
+            this.trailerUrl = trailers?.firstOrNull { it.isNotBlank() }
+        }
+
         fun LoadResponse.addDuration(duration: String?) {}
         fun LoadResponse.addActors(actors: List<String>?) {}
         fun LoadResponse.addActorNames(actors: List<String>?) {}

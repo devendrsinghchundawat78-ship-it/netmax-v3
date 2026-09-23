@@ -19,6 +19,17 @@ object TmdbHomeCatalogResolver {
 
     fun getTmdbCatalogDefinitions(): List<HomeCatalogDefinition> = listOf(
         HomeCatalogDefinition(
+            key = "tmdb:latest_releases",
+            defaultTitle = "Latest Releases",
+            catalogName = "Latest Releases",
+            addonName = "NetMax TMDB",
+            manifestUrl = "tmdb://latest_releases",
+            type = "movie",
+            catalogId = "latest_releases",
+            supportsPagination = true,
+            descriptorSignature = "tmdb:latest_releases",
+        ),
+        HomeCatalogDefinition(
             key = "tmdb:bollywood_trending",
             defaultTitle = "Trending Bollywood Movies",
             catalogName = "Trending Bollywood Movies",
@@ -176,6 +187,7 @@ object TmdbHomeCatalogResolver {
 
     fun endpointForDefinition(definition: HomeCatalogDefinition): String =
         when (definition.catalogId) {
+            "latest_releases" -> "movie/now_playing"
             "bollywood_trending", "bollywood_top_rated" -> "discover/movie"
             "bollywood_series" -> "discover/tv"
             "trending_movies" -> "trending/movie/day"
@@ -192,6 +204,7 @@ object TmdbHomeCatalogResolver {
 
     fun queryParamsForDefinition(definition: HomeCatalogDefinition): Map<String, String> =
         when (definition.catalogId) {
+            "latest_releases" -> emptyMap()
             "bollywood_trending" -> mapOf("with_original_language" to "hi", "sort_by" to "popularity.desc")
             "bollywood_series" -> mapOf("with_original_language" to "hi", "sort_by" to "popularity.desc")
             "bollywood_top_rated" -> mapOf("with_original_language" to "hi", "sort_by" to "vote_average.desc", "vote_count.gte" to "50")

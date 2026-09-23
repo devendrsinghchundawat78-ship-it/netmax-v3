@@ -305,9 +305,9 @@ private fun ExoPlayerSurface(
 
     val extractorsFactory = remember {
         DefaultExtractorsFactory()
+            .setConstantBitrateSeekingEnabled(true)
             .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS)
             .setTsExtractorTimestampSearchBytes(1500 * TsExtractor.TS_PACKET_SIZE)
-            .setMatroskaExtractorFlags(MatroskaExtractor.FLAG_DISABLE_SEEK_FOR_CUES)
     }
     val dataSourceFactory = remember(
         context,
@@ -399,13 +399,14 @@ private fun ExoPlayerSurface(
         }
 
         val loadControl = DefaultLoadControl.Builder()
-            .setTargetBufferBytes(128 * 1024 * 1024)
+            .setTargetBufferBytes(256 * 1024 * 1024)
             .setBufferDurationsMs(
-                20_000,
-                60_000,
-                1_500,
-                3_000
+                15_000,
+                50_000,
+                2_500,
+                5_000,
             )
+            .setBackBuffer(30_000, true)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 

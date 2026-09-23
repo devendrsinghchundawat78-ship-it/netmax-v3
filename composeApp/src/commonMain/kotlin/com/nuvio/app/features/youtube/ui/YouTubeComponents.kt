@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.HighQuality
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material3.Button
@@ -248,6 +249,7 @@ fun YouTubeFeedCategoryChips(
     selectedCategory: YouTubeFeedCategory,
     onSelectCategory: (YouTubeFeedCategory) -> Unit,
     modifier: Modifier = Modifier,
+    onRefresh: (() -> Unit)? = null,
 ) {
     val scrollState = rememberScrollState()
     Row(
@@ -258,6 +260,35 @@ fun YouTubeFeedCategoryChips(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (onRefresh != null) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFFE5A00D).copy(alpha = 0.20f))
+                    .clickable { onRefresh() }
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = "Refresh",
+                        tint = Color(0xFFE5A00D),
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        text = "Refresh",
+                        color = Color(0xFFE5A00D),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+
         categories.forEach { cat ->
             val isSelected = cat.id == selectedCategory.id
             Box(

@@ -3,6 +3,9 @@ package com.nuvio.app.features.youtube
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpPostJsonWithHeaders
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -25,28 +28,136 @@ object YouTubeRepository {
     private val fourKRegex = Regex("\\b(4k|2160p|uhd|8k|4320p)\\b", RegexOption.IGNORE_CASE)
 
     val defaultCategories = listOf(
-        YouTubeFeedCategory("trending", "Trending", "trending trailers movies 4k"),
-        YouTubeFeedCategory("trailers", "4K Trailers", "official 4k movie trailers 2025 2026"),
-        YouTubeFeedCategory("clips", "Movie Clips", "4k hdr movie clips scene dolby"),
-        YouTubeFeedCategory("cinema", "Cinema & Reviews", "cinema movies discussion and trailers"),
-        YouTubeFeedCategory("music", "Music Videos", "trending 4k official music videos"),
-        YouTubeFeedCategory("gaming", "Gaming", "4k gaming trailers walkthrough"),
+        YouTubeFeedCategory(
+            id = "trending",
+            label = "Trending",
+            searchQuery = "trending trailers movies 4k",
+            queryVariations = listOf(
+                "trending trailers movies 4k",
+                "latest official movie trailers 4k 2025 2026",
+                "trending movies clips 4k hdr dolby",
+                "new official movie teasers 4k",
+                "trending blockbuster trailers 4k uhd",
+                "viral movie cinema clips 4k 60fps",
+                "popular new movie previews 4k",
+            ),
+        ),
+        YouTubeFeedCategory(
+            id = "trailers",
+            label = "4K Trailers",
+            searchQuery = "official 4k movie trailers 2025 2026",
+            queryVariations = listOf(
+                "official 4k movie trailers 2025 2026",
+                "new 4k ultra hd movie trailers",
+                "latest hollywood bollywood official trailers 4k",
+                "upcoming cinema official trailers 4k hdr",
+                "official teaser trailer 4k uhd",
+                "new action sci-fi trailers 4k 2025",
+            ),
+        ),
+        YouTubeFeedCategory(
+            id = "clips",
+            label = "Movie Clips",
+            searchQuery = "4k hdr movie clips scene dolby",
+            queryVariations = listOf(
+                "4k hdr movie clips scene dolby",
+                "best movie action scenes 4k hdr",
+                "cinematic movie moments 4k ultra hd",
+                "epic movie scenes 4k 60fps",
+                "iconic movie clips 4k dolby vision",
+                "4k movie fight scene clips uhd",
+            ),
+        ),
+        YouTubeFeedCategory(
+            id = "cinema",
+            label = "Cinema & Reviews",
+            searchQuery = "cinema movies discussion and trailers",
+            queryVariations = listOf(
+                "cinema movies discussion and trailers",
+                "movie breakdown hidden details easter eggs 4k",
+                "cinema review new movie trailer breakdown",
+                "film analysis cinema video essay 4k",
+                "top upcoming cinema previews 4k",
+            ),
+        ),
+        YouTubeFeedCategory(
+            id = "music",
+            label = "Music Videos",
+            searchQuery = "trending 4k official music videos",
+            queryVariations = listOf(
+                "trending 4k official music videos",
+                "latest official music videos 4k hdr",
+                "top hits music videos 4k 2025",
+                "new music releases official video 4k",
+                "popular music video 4k ultra hd",
+            ),
+        ),
+        YouTubeFeedCategory(
+            id = "gaming",
+            label = "Gaming",
+            searchQuery = "4k gaming trailers walkthrough",
+            queryVariations = listOf(
+                "4k gaming trailers walkthrough",
+                "new gameplay trailer 4k 60fps ps5",
+                "latest video game cinematic trailers 4k",
+                "unreal engine 5 game trailer 4k",
+                "upcoming games trailer 4k 2025 2026",
+            ),
+        ),
     )
 
     private val feedCache = mutableMapOf<String, List<YouTubeVideoItem>>()
     private val channelCache = mutableMapOf<String, List<YouTubeVideoItem>>()
+    private val categoryIndices = mutableMapOf<String, Int>()
+    private val seenVideoIds = LinkedHashSet<String>()
+    private const val MAX_SEEN_IDS = 400
 
-    suspend fun fetchFeed(query: String, forceRefresh: Boolean = false): List<YouTubeVideoItem> = withContext(Dispatchers.Default) {
-        val cleanQuery = query.trim().ifBlank { "trending 4k trailers" }
+    suspend fun fetchFeed(
+        query: String,
+        forceRefresh: Boolean = false,
+        categoryId: String? = null,
+    ): List<YouTubeVideoItem> = withContext(Dispatchers.Default) {
+        val category = defaultCategories.firstOrNull { it.id == categoryId || it.searchQuery == query }
+        val effectiveQuery = if (category != null && category.queryVariations.isNotEmpty()) {
+            if (forceRefresh) {
+                val nextIdx = ((categoryIndices[category.id] ?: 0) + 1) % category.queryVariations.size
+                categoryIndices[category.id] = nextIdx
+                category.queryVariations[nextIdx]
+            } else {
+                val currentIdx = (categoryIndices[category.id] ?: 0) % category.queryVariations.size
+                category.queryVariations[currentIdx]
+            }
+        } else {
+            query.trim().ifBlank { "trending 4k trailers" }
+        }
+
+        val cacheKey = "${category?.id ?: "custom"}:$effectiveQuery"
         if (!forceRefresh) {
-            feedCache[cleanQuery]?.let { return@withContext it }
+            feedCache[cacheKey]?.let { return@withContext it }
+        } else {
+            feedCache.remove(cacheKey)
         }
 
-        val videos = searchInnerTube(cleanQuery)
-        if (videos.isNotEmpty()) {
-            feedCache[cleanQuery] = videos
+        val fetched = searchInnerTube(effectiveQuery)
+        if (fetched.isEmpty()) {
+            return@withContext feedCache[cacheKey].orEmpty()
         }
-        videos
+
+        // Put unseen videos first so each refresh delivers fresh, new content
+        val unseen = fetched.filterNot { seenVideoIds.contains(it.id) }
+        val seen = fetched.filter { seenVideoIds.contains(it.id) }
+        val ordered = if (unseen.isNotEmpty()) unseen + seen else fetched.shuffled()
+
+        fetched.forEach {
+            seenVideoIds.add(it.id)
+            if (seenVideoIds.size > MAX_SEEN_IDS) {
+                val first = seenVideoIds.first()
+                seenVideoIds.remove(first)
+            }
+        }
+
+        feedCache[cacheKey] = ordered
+        ordered
     }
 
     suspend fun searchVideos(query: String): List<YouTubeVideoItem> = withContext(Dispatchers.Default) {
@@ -71,9 +182,38 @@ object YouTubeRepository {
         if (excludeVideoId != null) videos.filterNot { it.id == excludeVideoId } else videos
     }
 
+    private val inFlightExtractions = mutableMapOf<String, kotlinx.coroutines.Deferred<List<YouTubeStreamQuality>>>()
+    private val extractionMutex = Mutex()
+
     suspend fun extractStreamQualities(videoId: String): List<YouTubeStreamQuality> = withContext(Dispatchers.Default) {
         if (!videoIdRegex.matches(videoId)) return@withContext emptyList()
 
+        val cached = YouTubePlayerQualityStore.getQualities(videoId)
+        if (cached.isNotEmpty()) return@withContext cached
+
+        val deferred = extractionMutex.withLock {
+            val alreadyCached = YouTubePlayerQualityStore.getQualities(videoId)
+            if (alreadyCached.isNotEmpty()) return@withLock async { alreadyCached }
+
+            inFlightExtractions[videoId]?.let { return@withLock it }
+
+            val newDeferred = async(Dispatchers.Default) {
+                performExtractStreamQualities(videoId)
+            }
+            inFlightExtractions[videoId] = newDeferred
+            newDeferred
+        }
+
+        try {
+            deferred.await()
+        } finally {
+            extractionMutex.withLock {
+                inFlightExtractions.remove(videoId)
+            }
+        }
+    }
+
+    private suspend fun performExtractStreamQualities(videoId: String): List<YouTubeStreamQuality> {
         val requestBody = buildJsonObject {
             putJsonObject("context") {
                 putJsonObject("client") {
@@ -93,16 +233,16 @@ object YouTubeRepository {
             "User-Agent" to "com.google.android.youtube/20.10.35 (Linux; U; Android 14; en_US)",
         )
 
-        try {
+        return try {
             val responseText = httpPostJsonWithHeaders(
                 url = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
                 body = requestBody,
                 headers = headers,
             )
-            if (responseText.isBlank()) return@withContext emptyList()
+            if (responseText.isBlank()) return emptyList()
 
             val root = json.parseToJsonElement(responseText).jsonObject
-            val streamingData = root["streamingData"]?.jsonObject ?: return@withContext emptyList()
+            val streamingData = root["streamingData"]?.jsonObject ?: return emptyList()
             val adaptive = streamingData["adaptiveFormats"]?.jsonArray.orEmpty()
             val progressive = streamingData["formats"]?.jsonArray.orEmpty()
 

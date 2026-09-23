@@ -103,6 +103,19 @@ internal actual object ExternalPlayerPlatform {
                 .map { "${it.key}: ${it.value}" }
                 .toTypedArray()
             putExtra("headers", headerArray)
+
+            val headerBundle = android.os.Bundle()
+            request.sourceHeaders.forEach { (key, value) ->
+                headerBundle.putString(key, value)
+            }
+            putExtra("android.media.intent.extra.HTTP_HEADERS", headerBundle)
+
+            request.sourceHeaders.entries.firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }?.value?.let {
+                putExtra(":http-user-agent", it)
+            }
+            request.sourceHeaders.entries.firstOrNull { it.key.equals("Referer", ignoreCase = true) }?.value?.let {
+                putExtra(":http-referrer", it)
+            }
         }
 
         // Subtitle extras

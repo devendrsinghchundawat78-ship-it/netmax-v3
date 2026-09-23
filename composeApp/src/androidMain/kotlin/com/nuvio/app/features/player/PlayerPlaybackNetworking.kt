@@ -24,6 +24,7 @@ internal object PlayerPlaybackNetworking {
         "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
             "AppleWebKit/537.36 (KHTML, like Gecko) " +
             "Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Encoding" to "identity",
     )
 
     internal const val DEFAULT_USER_AGENT =
@@ -82,22 +83,27 @@ internal object PlayerPlaybackNetworking {
     ): DataSource.Factory {
         val requestHeaders = sanitizeHeaders(defaultHeaders)
         val baseClient = if (useLongReadTimeout) loopbackPlaybackHttpClient else playbackHttpClient
-        val client = requestHeaders.headerValue("Authorization")?.let { authorization ->
+        val client = if (requestHeaders.isNotEmpty()) {
             baseClient.newBuilder()
                 .addNetworkInterceptor { chain ->
                     val request = chain.request()
-                    if (request.header("Authorization") == null) {
-                        chain.proceed(
-                            request.newBuilder()
-                                .header("Authorization", authorization)
-                                .build()
-                        )
+                    var builder: okhttp3.Request.Builder? = null
+                    requestHeaders.forEach { (key, value) ->
+                        if (request.header(key) == null) {
+                            if (builder == null) builder = request.newBuilder()
+                            builder!!.header(key, value)
+                        }
+                    }
+                    if (builder != null) {
+                        chain.proceed(builder!!.build())
                     } else {
                         chain.proceed(request)
                     }
                 }
                 .build()
-        } ?: baseClient
+        } else {
+            baseClient
+        }
 
         return OkHttpDataSource.Factory(client).apply {
             setDefaultRequestProperties(requestHeaders)

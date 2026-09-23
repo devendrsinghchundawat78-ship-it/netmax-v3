@@ -24,6 +24,7 @@ import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.jetbrains_sans_bold
 import nuvio.composeapp.generated.resources.jetbrains_sans_regular
 import nuvio.composeapp.generated.resources.jetbrains_sans_semibold
+import nuvio.composeapp.generated.resources.road_rage
 import org.jetbrains.compose.resources.Font
 
 val LocalAppTheme = staticCompositionLocalOf { AppTheme.WHITE }
@@ -61,6 +62,12 @@ private val JetBrainsSans: FontFamily
         Font(Res.font.jetbrains_sans_bold, FontWeight.Bold, FontStyle.Normal),
         Font(Res.font.jetbrains_sans_semibold, FontWeight.SemiBold, FontStyle.Normal),
         Font(Res.font.jetbrains_sans_regular, FontWeight.Normal, FontStyle.Normal),
+    )
+
+val RoadRageFontFamily: FontFamily
+    @Composable
+    get() = FontFamily(
+        Font(Res.font.road_rage, FontWeight.Normal, FontStyle.Normal),
     )
 
 private val NuvioTypography: Typography

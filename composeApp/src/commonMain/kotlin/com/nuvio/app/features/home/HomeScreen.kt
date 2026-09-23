@@ -29,11 +29,18 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.features.catalog.CatalogTarget
 import com.nuvio.app.features.home.components.HomeHeroCategoryHeader
 import com.nuvio.app.features.home.components.HomeHeroPosterCarouselSection
 import com.nuvio.app.features.youtube.YouTubeVideoItem
 import com.nuvio.app.features.youtube.ui.YouTubeHomeScreenSection
+import nuvio.composeapp.generated.resources.app_icon_original
 import org.jetbrains.compose.resources.painterResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -150,7 +157,7 @@ fun HomeScreen(
     onFirstCatalogRendered: (() -> Unit)? = null,
     onOpenYouTubeVideo: ((YouTubeVideoItem) -> Unit)? = null,
 ) {
-    var selectedHeroCategory by rememberSaveable { mutableStateOf("Trending") }
+    var selectedHeroCategory by rememberSaveable { mutableStateOf("Latest Releases") }
 
     LaunchedEffect(Unit) {
         AddonRepository.initialize()
@@ -190,7 +197,7 @@ fun HomeScreen(
 
     LaunchedEffect(scrollToTopRequests) {
         scrollToTopRequests.collect {
-            selectedHeroCategory = "Trending"
+            selectedHeroCategory = "Latest Releases"
             homeListState.animateScrollToItem(0)
         }
     }
@@ -860,6 +867,125 @@ fun HomeScreen(
     val keyedEnabledHomeItems = remember(enabledHomeItems) {
         enabledHomeItems.withDuplicateSafeLazyKeys(HomeCatalogSettingsItem::key)
     }
+
+    LaunchedEffect(selectedHeroCategory) {
+        homeListState.scrollToItem(0)
+    }
+
+    val filteredHeroItems = remember(homeUiState.heroItems, homeUiState.sections, selectedHeroCategory) {
+        val filtered = when (selectedHeroCategory) {
+            "Trending" -> {
+                val trendingItems = homeUiState.heroItems.filter { item ->
+                    (item.popularity ?: 0.0) > 15.0 || (item.voteCount ?: 0) > 100
+                }
+                if (trendingItems.isNotEmpty()) {
+                    trendingItems
+                } else {
+                    val fromSections = homeUiState.sections
+                        .filter { it.isTrendingSection() }
+                        .flatMap { it.items }
+                        .distinctBy { it.stableKey() }
+                    if (fromSections.isNotEmpty()) fromSections else homeUiState.heroItems
+                }
+            }
+            "Movies" -> {
+                val movieItems = homeUiState.heroItems.filter { it.type.equals("movie", ignoreCase = true) }
+                if (movieItems.isNotEmpty()) {
+                    movieItems
+                } else {
+                    val fromSections = homeUiState.sections
+                        .filter { it.isMovieSection() }
+                        .flatMap { it.items }
+                        .distinctBy { it.stableKey() }
+                    if (fromSections.isNotEmpty()) fromSections else homeUiState.heroItems
+                }
+            }
+            "Serials" -> {
+                val bollywoodSeriesItems = homeUiState.sections
+                    .filter { it.key.contains("bollywood_series", ignoreCase = true) }
+                    .flatMap { it.items }
+                val seriesHero = homeUiState.heroItems.filter {
+                    it.type.equals("series", ignoreCase = true) || it.type.equals("tv", ignoreCase = true)
+                }
+                val combined = (bollywoodSeriesItems + seriesHero).distinctBy { it.stableKey() }
+                if (combined.isNotEmpty()) {
+                    combined
+                } else {
+                    val fromSections = homeUiState.sections
+                        .filter { it.isSeriesSection() }
+                        .flatMap { it.items }
+                        .distinctBy { it.stableKey() }
+                    if (fromSections.isNotEmpty()) fromSections else homeUiState.heroItems
+                }
+            }
+            "TV Shows" -> {
+                val tvItems = homeUiState.heroItems.filter {
+                    it.type.equals("series", ignoreCase = true) || it.type.equals("tv", ignoreCase = true)
+                }
+                if (tvItems.isNotEmpty()) {
+                    tvItems
+                } else {
+                    val fromSections = homeUiState.sections
+                        .filter { it.isSeriesSection() }
+                        .flatMap { it.items }
+                        .distinctBy { it.stableKey() }
+                    if (fromSections.isNotEmpty()) fromSections else homeUiState.heroItems
+                }
+            }
+            else -> homeUiState.heroItems
+        }
+        filtered.ifEmpty { homeUiState.heroItems }
+    }
+
+    val filteredKeyedHomeItems = remember(keyedEnabledHomeItems, selectedHeroCategory, sectionsMap) {
+        val filtered = when (selectedHeroCategory) {
+            "Trending" -> {
+                keyedEnabledHomeItems.filter { keyed ->
+                    val section = sectionsMap[keyed.value.key] ?: return@filter false
+                    section.isTrendingSection()
+                }
+            }
+            "Movies" -> {
+                keyedEnabledHomeItems.filter { keyed ->
+                    val section = sectionsMap[keyed.value.key] ?: return@filter false
+                    section.isMovieSection()
+                }
+            }
+            "Serials" -> {
+                val serials = keyedEnabledHomeItems.filter { keyed ->
+                    val section = sectionsMap[keyed.value.key] ?: return@filter false
+                    section.isSeriesSection()
+                }
+                serials.sortedByDescending { keyed ->
+                    if (keyed.value.key.contains("bollywood_series", ignoreCase = true)) 2
+                    else if (keyed.value.key.contains("series", ignoreCase = true)) 1
+                    else 0
+                }
+            }
+            "TV Shows" -> {
+                keyedEnabledHomeItems.filter { keyed ->
+                    val section = sectionsMap[keyed.value.key] ?: return@filter false
+                    section.isSeriesSection()
+                }
+            }
+            else -> keyedEnabledHomeItems
+        }
+        if (filtered.isEmpty() && selectedHeroCategory != "Latest Releases") {
+            keyedEnabledHomeItems
+        } else {
+            filtered
+        }
+    }
+
+    val filteredContinueWatchingItems = remember(continueWatchingItems, selectedHeroCategory) {
+        when (selectedHeroCategory) {
+            "Movies" -> continueWatchingItems.filter { it.parentMetaType.equals("movie", ignoreCase = true) }
+            "Serials", "TV Shows" -> continueWatchingItems.filter {
+                it.parentMetaType.equals("series", ignoreCase = true) || it.parentMetaType.equals("tv", ignoreCase = true)
+            }
+            else -> continueWatchingItems
+        }
+    }
     LaunchedEffect(
         watchedUiState.items,
         watchProgressUiState.entries,
@@ -964,10 +1090,10 @@ fun HomeScreen(
                                 mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
                             )
 
-                            homeUiState.heroItems.isNotEmpty() -> {
+                            filteredHeroItems.isNotEmpty() -> {
                                 if (homeSettingsUiState.heroBannerStyle == HeroBannerStyle.POSTER_CAROUSEL) {
                                     HomeHeroPosterCarouselSection(
-                                        items = homeUiState.heroItems,
+                                        items = filteredHeroItems,
                                         modifier = Modifier,
                                         selectedCategory = selectedHeroCategory,
                                         onCategorySelected = { selectedHeroCategory = it },
@@ -977,17 +1103,17 @@ fun HomeScreen(
                                         onItemClick = onPosterClick,
                                     )
                                 } else {
-                                HomeHeroSection(
-                                    items = homeUiState.heroItems,
-                                    modifier = Modifier,
-                                    viewportHeight = maxHeight,
-                                    mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
-                                    listState = homeListState,
-                                    stretchPx = { heroStretchState.stretchPx },
-                                    onItemClick = onPosterClick,
-                                )
+                                    HomeHeroSection(
+                                        items = filteredHeroItems,
+                                        modifier = Modifier,
+                                        viewportHeight = maxHeight,
+                                        mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                                        listState = homeListState,
+                                        stretchPx = { heroStretchState.stretchPx },
+                                        onItemClick = onPosterClick,
+                                    )
+                                }
                             }
-                        }
 
                         else -> HomeHeroReservedSpace(
                             modifier = Modifier,
@@ -1020,7 +1146,7 @@ fun HomeScreen(
                     }
                 }
 
-                !hasActiveAddons && !hasRenderableCollectionRows && homeUiState.sections.isEmpty() -> {
+                enabledAddons.isEmpty() && !hasRenderableCollectionRows && homeUiState.sections.isEmpty() -> {
                     homeContinueWatchingSections(
                         preferences = continueWatchingPreferences,
                         continueWatchingItems = continueWatchingItems,
@@ -1035,38 +1161,60 @@ fun HomeScreen(
                         disintegrationRequest = continueWatchingDisintegrationRequest,
                     )
                     item {
-                        when {
-                            networkStatusUiState.isOfflineLike && addonManifestErrorMessage != null -> {
+                        HomeEmptyStateCard(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            title = stringResource(Res.string.compose_search_empty_no_active_addons_title),
+                            message = stringResource(Res.string.home_empty_no_active_addons_message),
+                        )
+                    }
+                }
+
+                enabledAddons.isNotEmpty() && !hasRenderableCollectionRows && homeUiState.sections.isEmpty() -> {
+                    homeContinueWatchingSections(
+                        preferences = continueWatchingPreferences,
+                        continueWatchingItems = continueWatchingItems,
+                        upcomingItems = upcomingItems,
+                        dataSourceKey = effectiveWatchProgressSource,
+                        sectionPadding = homeSectionPadding,
+                        layout = continueWatchingLayout,
+                        continueWatchingListState = continueWatchingListState,
+                        upcomingListState = upcomingListState,
+                        onItemClick = onContinueWatchingClick,
+                        onItemLongPress = onContinueWatchingLongPress,
+                        disintegrationRequest = continueWatchingDisintegrationRequest,
+                    )
+                    val combinedErrorMessage = addonManifestErrorMessage ?: homeUiState.errorMessage
+                    if (combinedErrorMessage != null) {
+                        item {
+                            if (networkStatusUiState.isOfflineLike) {
                                 NuvioNetworkOfflineCard(
                                     condition = networkStatusUiState.condition,
                                     modifier = Modifier.padding(horizontal = 16.dp),
                                     onRetry = {
                                         NetworkStatusRepository.requestRefresh(force = true)
                                         AddonRepository.refreshAll()
+                                        HomeRepository.refresh(addonsUiState.addons.enabledAddons(), force = true)
                                     },
                                 )
-                            }
-
-                            addonManifestErrorMessage != null -> {
+                            } else {
                                 HomeEmptyStateCard(
                                     modifier = Modifier.padding(horizontal = 16.dp),
                                     title = stringResource(Res.string.home_load_failed_title),
-                                    message = addonManifestErrorMessage,
+                                    message = combinedErrorMessage,
                                     actionLabel = stringResource(Res.string.action_retry),
                                     onActionClick = {
                                         NetworkStatusRepository.requestRefresh(force = true)
                                         AddonRepository.refreshAll()
+                                        HomeRepository.refresh(addonsUiState.addons.enabledAddons(), force = true)
                                     },
                                 )
                             }
-
-                            else -> {
-                                HomeEmptyStateCard(
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                    title = stringResource(Res.string.compose_search_empty_no_active_addons_title),
-                                    message = stringResource(Res.string.home_empty_no_active_addons_message),
-                                )
-                            }
+                        }
+                    } else {
+                        items(3) {
+                            HomeSkeletonRow(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                            )
                         }
                     }
                 }
@@ -1114,7 +1262,7 @@ fun HomeScreen(
                 else -> {
                     homeContinueWatchingSections(
                         preferences = continueWatchingPreferences,
-                        continueWatchingItems = continueWatchingItems,
+                        continueWatchingItems = filteredContinueWatchingItems,
                         upcomingItems = upcomingItems,
                         dataSourceKey = effectiveWatchProgressSource,
                         sectionPadding = homeSectionPadding,
@@ -1127,19 +1275,21 @@ fun HomeScreen(
                     )
 
                     val renderedSectionKeys = mutableSetOf<String>()
-                    keyedEnabledHomeItems.forEach { keyedSettingsItem ->
+                    filteredKeyedHomeItems.forEach { keyedSettingsItem ->
                         val settingsItem = keyedSettingsItem.value
                         if (settingsItem.isCollection) {
-                            val collection = collectionsMap[settingsItem.key]
-                            if (collection != null) {
-                                item(key = keyedSettingsItem.lazyKey) {
-                                    HomeCollectionRowSection(
-                                        collection = collection,
-                                        modifier = Modifier.padding(bottom = 12.dp),
-                                        sectionPadding = homeSectionPadding,
-                                        animateGifs = animateCollectionGifs,
-                                        onFolderClick = onFolderClick,
-                                    )
+                            if (selectedHeroCategory == "Latest Releases") {
+                                val collection = collectionsMap[settingsItem.key]
+                                if (collection != null) {
+                                    item(key = keyedSettingsItem.lazyKey) {
+                                        HomeCollectionRowSection(
+                                            collection = collection,
+                                            modifier = Modifier.padding(bottom = 12.dp),
+                                            sectionPadding = homeSectionPadding,
+                                            animateGifs = animateCollectionGifs,
+                                            onFolderClick = onFolderClick,
+                                        )
+                                    }
                                 }
                             }
                         } else {
@@ -1168,7 +1318,13 @@ fun HomeScreen(
                     }
 
                     homeUiState.sections.forEach { section ->
-                        if (section.items.isNotEmpty() && !renderedSectionKeys.contains(section.key)) {
+                        val matchesCategory = when (selectedHeroCategory) {
+                            "Trending" -> section.isTrendingSection()
+                            "Movies" -> section.isMovieSection()
+                            "Serials", "TV Shows" -> section.isSeriesSection()
+                            else -> true
+                        }
+                        if (matchesCategory && section.items.isNotEmpty() && !renderedSectionKeys.contains(section.key)) {
                             item(key = "home_section_${section.key}") {
                                 HomeCatalogRowSection(
                                     section = section,
@@ -1228,18 +1384,36 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Image(
-                        painter = painterResource(Res.drawable.netmax_logo),
+                        painter = painterResource(Res.drawable.app_icon_original),
                         contentDescription = "NetMax",
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(6.dp)),
                         contentScale = ContentScale.Fit,
                     )
                     Text(
-                        text = "NetMax",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
+                        text = buildAnnotatedString {
+                            withStyle(
+                                SpanStyle(
+                                    color = Color.White,
+                                    fontWeight = FontWeight.ExtraBold,
+                                ),
+                            ) {
+                                append("NET")
+                            }
+                            withStyle(
+                                SpanStyle(
+                                    color = Color(0xFFE50914),
+                                    fontWeight = FontWeight.ExtraBold,
+                                ),
+                            ) {
+                                append("MAX")
+                            }
+                        },
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = 20.sp,
                             letterSpacing = 0.5.sp,
                         ),
-                        color = Color.White,
                     )
                 }
             }
@@ -2059,3 +2233,44 @@ private fun ContinueWatchingItem.isCloudLibraryContinueWatchingItem(): Boolean =
 private fun WatchProgressEntry.isCloudLibraryProgressEntry(): Boolean =
     contentType.equals(CloudLibraryContentType, ignoreCase = true) ||
         parentMetaType.equals(CloudLibraryContentType, ignoreCase = true)
+
+private fun HomeCatalogSection.isMovieSection(): Boolean {
+    if (key.contains(":movie:", ignoreCase = true) ||
+        key.endsWith("_movies", ignoreCase = true) ||
+        key.contains("movies", ignoreCase = true) ||
+        key == "tmdb:latest_releases" ||
+        key == "tmdb:bollywood_trending" ||
+        key == "tmdb:bollywood_top_rated" ||
+        key == "tmdb:upcoming_movies"
+    ) return true
+    val currentTarget = target
+    if (currentTarget is CatalogTarget.Tmdb && currentTarget.contentType.equals("movie", ignoreCase = true)) return true
+    if (currentTarget is CatalogTarget.Addon && currentTarget.contentType.equals("movie", ignoreCase = true)) return true
+    return items.isNotEmpty() && items.all { it.type.equals("movie", ignoreCase = true) }
+}
+
+private fun HomeCatalogSection.isSeriesSection(): Boolean {
+    if (key.contains(":series:", ignoreCase = true) ||
+        key.contains("series", ignoreCase = true) ||
+        key.contains("bollywood_series", ignoreCase = true) ||
+        key.contains("anime", ignoreCase = true) ||
+        key.contains("kdrama", ignoreCase = true) ||
+        title.contains("series", ignoreCase = true) ||
+        title.contains("show", ignoreCase = true) ||
+        title.contains("serial", ignoreCase = true)
+    ) return true
+    val currentTarget = target
+    if (currentTarget is CatalogTarget.Tmdb && currentTarget.contentType.equals("series", ignoreCase = true)) return true
+    if (currentTarget is CatalogTarget.Addon && currentTarget.contentType.equals("series", ignoreCase = true)) return true
+    return items.isNotEmpty() && items.all { it.type.equals("series", ignoreCase = true) || it.type.equals("tv", ignoreCase = true) }
+}
+
+private fun HomeCatalogSection.isTrendingSection(): Boolean {
+    return key.contains("trending", ignoreCase = true) ||
+        key.contains("popular", ignoreCase = true) ||
+        key.contains("top_rated", ignoreCase = true) ||
+        title.contains("trending", ignoreCase = true) ||
+        title.contains("popular", ignoreCase = true) ||
+        title.contains("top rated", ignoreCase = true)
+}
+

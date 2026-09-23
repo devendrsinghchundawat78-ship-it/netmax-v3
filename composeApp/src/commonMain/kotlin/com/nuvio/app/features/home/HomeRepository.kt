@@ -49,7 +49,9 @@ object HomeRepository {
         val requests = buildHomeCatalogDefinitions(activeAddons)
         currentDefinitions = requests
         val requestCacheKeys = requests.mapTo(mutableSetOf(), HomeCatalogDefinition::cacheKey)
-        cachedSections = cachedSections.filterKeys(requestCacheKeys::contains)
+        if (requestCacheKeys.isNotEmpty()) {
+            cachedSections = cachedSections.filterKeys(requestCacheKeys::contains)
+        }
         val requestKey = requests.joinToString(separator = "|", transform = HomeCatalogDefinition::cacheKey)
         currentRequestKey = requestKey
 
@@ -60,7 +62,6 @@ object HomeRepository {
             activeJob?.cancel()
             activeJob = null
             activeRequestKey = null
-            cachedSections = emptyMap()
             lastErrorMessage = null
             publishCurrentState(
                 isLoading = false,

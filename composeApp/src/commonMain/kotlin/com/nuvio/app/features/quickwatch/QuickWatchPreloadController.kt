@@ -139,7 +139,7 @@ object QuickWatchPreloadController {
     fun clear() {
         activeJobs.values.forEach { it.cancel() }
         activeJobs.clear()
-        synchronized(resolvedCache) { resolvedCache.clear() }
+        resolvedCache.clear()
         _playbackStates.value = emptyMap()
     }
 }

@@ -2,6 +2,8 @@ package com.nuvio.app.features.plugins.runtime.cs3
 
 import co.touchlab.kermit.Logger
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.metaproviders.TmdbProvider
+import com.lagradost.cloudstream3.utils.AppUtils
 import com.lagradost.cloudstream3.utils.Qualities
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.plugins.PluginRuntimeResult
@@ -61,73 +63,116 @@ object CloudstreamPluginRuntime {
             return emptyList()
         }
 
-        // Try getting media details from active UI state first (ensures accurate human-readable title)
+        val isTmdbProvider = api is TmdbProvider ||
+            api.mainUrl.contains("themoviedb.org", ignoreCase = true) ||
+            api.name.equals("SoraStream", ignoreCase = true) ||
+            api.name.equals("SoraStreamLite", ignoreCase = true) ||
+            api.name.equals("SuperStream", ignoreCase = true)
+
         val activeMeta = MetaDetailsRepository.uiState.value.meta
         val metaName = activeMeta?.name?.takeIf { it.isNotBlank() }
         val metaYear = activeMeta?.releaseInfo?.take(4)?.toIntOrNull()
             ?: activeMeta?.lastAirDate?.take(4)?.toIntOrNull()
 
-        val (tmdbTitle, tmdbYear) = runCatching {
-            TmdbService.fetchMediaTitleAndYear(
-                tmdbId = tmdbId,
-                mediaType = mediaType,
-            )
-        }.getOrNull() ?: (null to null)
+        val numericTmdbId = tmdbId.toIntOrNull()
+            ?: TmdbService.ensureTmdbId(tmdbId, mediaType)?.toIntOrNull()
+
+        val imdbId: String? = activeMeta?.id?.takeIf { it.startsWith("tt", ignoreCase = true) }
+            ?: if (tmdbId.startsWith("tt", ignoreCase = true)) tmdbId
+            else numericTmdbId?.let { runCatching { TmdbService.tmdbToImdb(it, mediaType) }.getOrNull() }
+
+        val (tmdbTitle, tmdbYear) = if (numericTmdbId != null) {
+            runCatching {
+                TmdbService.fetchMediaTitleAndYear(
+                    tmdbId = numericTmdbId.toString(),
+                    mediaType = mediaType,
+                )
+            }.getOrNull() ?: (null to null)
+        } else (null to null)
 
         val releaseYear = metaYear ?: tmdbYear
-        val searchCandidates = listOfNotNull(
-            metaName,
-            tmdbTitle,
-            if (metaName.isNullOrBlank() && tmdbTitle.isNullOrBlank()) tmdbId.takeIf { it.isNotBlank() } else null
-        ).distinct()
+        val cleanTitle = tmdbTitle ?: metaName ?: ""
+        val tmdbMediaType = if (season != null || episode != null || mediaType == "tv") "tv" else "movie"
 
-        var searchResults: List<SearchResponse> = emptyList()
-        var usedQuery = searchCandidates.firstOrNull().orEmpty()
-
-        for (candidate in searchCandidates) {
-            log.d { "Searching ${api.name} for '$candidate'" }
-            searchResults = runCatching { api.search(candidate) }.getOrNull().orEmpty()
-            if (searchResults.isEmpty()) {
-                searchResults = runCatching { api.quickSearch(candidate) }.getOrNull().orEmpty()
-            }
-            if (searchResults.isNotEmpty()) {
-                usedQuery = candidate
-                break
-            }
-
-            // Retry with sanitized alphanumeric title
-            val sanitized = sanitizeSearchQuery(candidate)
-            if (sanitized.isNotBlank() && !sanitized.equals(candidate, ignoreCase = true)) {
-                log.d { "Retrying search on ${api.name} with sanitized query '$sanitized'" }
-                searchResults = runCatching { api.search(sanitized) }.getOrNull().orEmpty()
-                if (searchResults.isEmpty()) {
-                    searchResults = runCatching { api.quickSearch(sanitized) }.getOrNull().orEmpty()
-                }
-                if (searchResults.isNotEmpty()) {
-                    usedQuery = sanitized
-                    break
-                }
-            }
-        }
-
-        if (searchResults.isEmpty()) {
-            log.d { "No search results found on ${api.name} for query candidates: $searchCandidates" }
-            return emptyList()
-        }
-
-        val matchedResult = findBestMatch(
-            results = searchResults,
-            query = usedQuery,
+        val synthesizedLinkData = buildLinkDataJson(
+            id = numericTmdbId,
+            imdbId = imdbId,
+            title = cleanTitle,
             year = releaseYear,
-        ) ?: searchResults.first()
+            season = season,
+            episode = episode,
+            type = tmdbMediaType,
+        )
 
-        log.d { "Selected match: '${matchedResult.name}' (${matchedResult.url})" }
+        var loadResponse: LoadResponse? = null
 
-        val loadResponse = runCatching {
-            api.load(matchedResult.url)
-        }.getOrNull() ?: return emptyList()
+        // 1. Direct TMDB load path for TMDB-based providers (bypasses flaky title search)
+        if (isTmdbProvider && numericTmdbId != null) {
+            val directPayload = """{"id":$numericTmdbId,"type":"$tmdbMediaType"}"""
+            log.d { "Direct TMDB load on ${api.name} with: $directPayload" }
+            loadResponse = runCatching { api.load(directPayload) }.getOrNull()
 
-        val episodeData: String? = when (loadResponse) {
+            if (loadResponse == null) {
+                val directUrl = "https://api.themoviedb.org/3/$tmdbMediaType/$numericTmdbId"
+                loadResponse = runCatching { api.load(directUrl) }.getOrNull()
+            }
+        }
+
+        // 2. Search path (for direct site scrapers or if direct TMDB load didn't resolve)
+        if (loadResponse == null) {
+            val searchCandidates = listOfNotNull(
+                cleanTitle.takeIf { it.isNotBlank() },
+                metaName?.takeIf { it.isNotBlank() && it != cleanTitle },
+                tmdbTitle?.takeIf { it.isNotBlank() && it != cleanTitle },
+            ).distinct()
+
+            if (searchCandidates.isEmpty()) {
+                log.w { "No valid title available to search on ${api.name}" }
+            } else {
+                var searchResults: List<SearchResponse> = emptyList()
+                var usedQuery = searchCandidates.first()
+
+                for (candidate in searchCandidates) {
+                    log.d { "Searching ${api.name} for '$candidate'" }
+                    searchResults = runCatching { api.search(candidate) }.getOrNull().orEmpty()
+                    if (searchResults.isEmpty()) {
+                        searchResults = runCatching { api.quickSearch(candidate) }.getOrNull().orEmpty()
+                    }
+                    if (searchResults.isNotEmpty()) {
+                        usedQuery = candidate
+                        break
+                    }
+
+                    // Retry with sanitized alphanumeric title
+                    val sanitized = sanitizeSearchQuery(candidate)
+                    if (sanitized.isNotBlank() && !sanitized.equals(candidate, ignoreCase = true)) {
+                        log.d { "Retrying search on ${api.name} with sanitized query '$sanitized'" }
+                        searchResults = runCatching { api.search(sanitized) }.getOrNull().orEmpty()
+                        if (searchResults.isEmpty()) {
+                            searchResults = runCatching { api.quickSearch(sanitized) }.getOrNull().orEmpty()
+                        }
+                        if (searchResults.isNotEmpty()) {
+                            usedQuery = sanitized
+                            break
+                        }
+                    }
+                }
+
+                if (searchResults.isNotEmpty()) {
+                    val matchedResult = findBestMatch(
+                        results = searchResults,
+                        query = usedQuery,
+                        year = releaseYear,
+                    ) ?: searchResults.first()
+
+                    log.d { "Selected match on ${api.name}: '${matchedResult.name}' (${matchedResult.url})" }
+                    loadResponse = runCatching { api.load(matchedResult.url) }.getOrNull()
+                }
+            }
+        }
+
+        // 3. Resolve episodeData
+        var episodeData: String? = when (loadResponse) {
             is AnimeLoadResponse -> {
                 val allEpisodes = loadResponse.episodes.values.flatten()
                 val targetEp = if (episode != null) {
@@ -147,54 +192,71 @@ object CloudstreamPluginRuntime {
             is MovieLoadResponse -> {
                 loadResponse.dataUrl.ifBlank { loadResponse.url }
             }
-            else -> loadResponse.url.takeIf { it.isNotBlank() }
+            else -> loadResponse?.url?.takeIf { it.isNotBlank() }
+        }
+
+        // 4. For TMDB providers: if episodeData is missing or not a JSON object, use synthesized LinkData
+        if (isTmdbProvider && (episodeData.isNullOrBlank() || !episodeData.trimStart().startsWith("{"))) {
+            log.d { "Using synthesized LinkData for ${api.name}" }
+            episodeData = synthesizedLinkData
         }
 
         if (episodeData.isNullOrBlank()) {
-            log.d { "No episode/movie data link found in load response" }
+            log.w { "No episode/movie data link found on ${api.name}" }
             return emptyList()
         }
 
-        log.d { "Extracting stream links for episode/movie data..." }
+        log.d { "Extracting stream links on ${api.name}..." }
 
         val results = mutableListOf<PluginRuntimeResult>()
         val subtitles = mutableListOf<PluginSubtitleResult>()
 
-        runCatching {
-            api.loadLinks(
-                data = episodeData,
-                isCasting = false,
-                subtitleCallback = { sub ->
-                    if (sub.url.isNotBlank()) {
-                        subtitles.add(
-                            PluginSubtitleResult(
-                                url = sub.url,
-                                language = sub.lang.ifBlank { "Unknown" },
-                                name = sub.lang.takeIf { it.isNotBlank() },
-                                headers = sub.headers.takeIf { it.isNotEmpty() },
+        suspend fun extractLinks(dataToLoad: String) {
+            try {
+                api.loadLinks(
+                    data = dataToLoad,
+                    isCasting = false,
+                    subtitleCallback = { sub ->
+                        if (sub.url.isNotBlank()) {
+                            subtitles.add(
+                                PluginSubtitleResult(
+                                    url = sub.url,
+                                    language = sub.lang.ifBlank { "Unknown" },
+                                    name = sub.lang.takeIf { it.isNotBlank() },
+                                    headers = sub.headers.takeIf { it.isNotEmpty() },
+                                )
                             )
-                        )
-                    }
-                },
-                callback = { link ->
-                    if (link.url.isNotBlank()) {
-                        val linkHeaders = link.getAllHeaders().takeIf { it.isNotEmpty() }
-                        results.add(
-                            PluginRuntimeResult(
-                                title = link.name.ifBlank { api.name },
-                                name = link.name.takeIf { it.isNotBlank() } ?: api.name,
-                                url = link.url,
-                                quality = Qualities.getStringByInt(link.quality),
-                                provider = api.name,
-                                headers = linkHeaders,
-                                subtitles = null,
+                        }
+                    },
+                    callback = { link ->
+                        if (link.url.isNotBlank()) {
+                            val linkHeaders = link.getAllHeaders().takeIf { it.isNotEmpty() }
+                            results.add(
+                                PluginRuntimeResult(
+                                    title = link.name.ifBlank { api.name },
+                                    name = link.name.takeIf { it.isNotBlank() } ?: api.name,
+                                    url = link.url,
+                                    quality = Qualities.getStringByInt(link.quality),
+                                    provider = api.name,
+                                    headers = linkHeaders,
+                                    subtitles = null,
+                                )
                             )
-                        )
+                        }
                     }
-                }
-            )
-        }.onFailure {
-            log.w(it) { "Error during loadLinks on ${api.name}" }
+                )
+            } catch (t: Throwable) {
+                if (t is kotlinx.coroutines.CancellationException) throw t
+                log.w(t) { "Error during loadLinks on ${api.name}" }
+            }
+        }
+
+        extractLinks(episodeData)
+
+        // Retry with synthesized LinkData if initial extraction yielded nothing for TMDB provider
+        if (results.isEmpty() && isTmdbProvider && episodeData != synthesizedLinkData) {
+            log.d { "Retrying loadLinks on ${api.name} with synthesized LinkData" }
+            extractLinks(synthesizedLinkData)
         }
 
         // Attach parsed subtitles to stream links if any were received
@@ -209,6 +271,27 @@ object CloudstreamPluginRuntime {
 
         log.d { "Extracted ${finalResults.size} stream links from ${api.name}" }
         return finalResults
+    }
+
+    private fun buildLinkDataJson(
+        id: Int?,
+        imdbId: String?,
+        title: String?,
+        year: Int?,
+        season: Int?,
+        episode: Int?,
+        type: String,
+    ): String {
+        val map = mutableMapOf<String, Any?>()
+        if (id != null) map["id"] = id
+        if (!imdbId.isNullOrBlank()) map["imdbId"] = imdbId
+        if (!title.isNullOrBlank()) map["title"] = title
+        if (year != null) map["year"] = year
+        if (season != null) map["season"] = season
+        if (episode != null) map["episode"] = episode
+        map["type"] = type
+        map["isAnime"] = false
+        return AppUtils.toJson(map)
     }
 
     private fun sanitizeSearchQuery(query: String): String =

@@ -140,6 +140,10 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     ) {
         val playerSurfaceSourceUrl = if (isP2pPlaybackActive) p2pResolvedSourceUrl else activeSourceUrl
         val initialPositionRequestKey = currentInitialPositionRequestKey()
+        val isYouTubePlayback = contentType == "youtube" ||
+            activeVideoId?.startsWith("yt_") == true ||
+            playerSurfaceSourceUrl?.contains("googlevideo.com") == true ||
+            activeSourceAudioUrl?.contains("googlevideo.com") == true
         if (playerSurfaceSourceUrl != null) {
             PlatformPlayerSurface(
                 sourceUrl = playerSurfaceSourceUrl,
@@ -148,6 +152,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 sourceResponseHeaders = activeSourceResponseHeaders,
                 externalSubtitles = externalSubtitles,
                 streamType = activeStreamType,
+                useYoutubeChunkedPlayback = isYouTubePlayback,
                 modifier = Modifier.fillMaxSize(),
                 playWhenReady = shouldPlay,
                 initialPositionMs = activeInitialPositionMs.takeIf { it > 0L },

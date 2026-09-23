@@ -60,7 +60,7 @@ fun YouTubeHomeScreenSection(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    fun loadVideos(query: String, isSearch: Boolean = false) {
+    fun loadVideos(query: String, isSearch: Boolean = false, forceRefresh: Boolean = false) {
         isLoading = true
         errorMessage = null
         scope.launch {
@@ -68,11 +68,24 @@ fun YouTubeHomeScreenSection(
                 val results = if (isSearch) {
                     YouTubeRepository.searchVideos(query)
                 } else {
-                    YouTubeRepository.fetchFeed(query)
+                    YouTubeRepository.fetchFeed(
+                        query = query,
+                        forceRefresh = forceRefresh,
+                        categoryId = selectedCategory.id,
+                    )
                 }
                 videos = results
                 if (results.isEmpty()) {
                     errorMessage = "No YouTube videos found. Please try another query."
+                } else {
+                    // Pre-fetch stream qualities for top videos in background so tapping any video plays instantly
+                    scope.launch(kotlinx.coroutines.Dispatchers.Default) {
+                        results.take(4).forEach { video ->
+                            if (com.nuvio.app.features.youtube.YouTubePlayerQualityStore.getQualities(video.id).isEmpty()) {
+                                runCatching { YouTubeRepository.extractStreamQualities(video.id) }
+                            }
+                        }
+                    }
                 }
             } catch (e: Throwable) {
                 errorMessage = "Failed to load YouTube videos: ${e.message}"
@@ -133,8 +146,17 @@ fun YouTubeHomeScreenSection(
                         categories = categories,
                         selectedCategory = selectedCategory,
                         onSelectCategory = { cat ->
-                            selectedCategory = cat
-                            searchQuery = ""
+                            if (selectedCategory.id == cat.id) {
+                                // Re-tapping same category refreshes with fresh videos
+                                loadVideos(cat.searchQuery, isSearch = false, forceRefresh = true)
+                            } else {
+                                selectedCategory = cat
+                                searchQuery = ""
+                            }
+                        },
+                        onRefresh = {
+                            val activeQuery = if (searchQuery.isNotBlank()) searchQuery else selectedCategory.searchQuery
+                            loadVideos(activeQuery, isSearch = searchQuery.isNotBlank(), forceRefresh = true)
                         },
                     )
                 }
@@ -188,7 +210,7 @@ fun YouTubeHomeScreenSection(
                                 fontSize = 14.sp,
                             )
                             Button(
-                                onClick = { loadVideos(selectedCategory.searchQuery) },
+                                onClick = { loadVideos(selectedCategory.searchQuery, forceRefresh = true) },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5A00D)),
                                 shape = RoundedCornerShape(12.dp),
                             ) {

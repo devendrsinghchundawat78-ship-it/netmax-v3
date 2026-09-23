@@ -47,17 +47,31 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import coil3.compose.AsyncImage
+import com.kmpalette.rememberDominantColorState
+import com.kmpalette.extensions.painter.rememberPainterDominantColorState
 import com.nuvio.app.core.format.extractReleaseYearForDisplay
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.features.details.components.loadedBackdropImageBitmap
 import com.nuvio.app.features.home.MetaPreview
 import kotlinx.coroutines.delay
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.app_icon_original
 import nuvio.composeapp.generated.resources.netmax_logo
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.absoluteValue
@@ -72,7 +86,7 @@ fun HomeHeroCategoryHeader(
     horizontalPadding: Dp = 20.dp,
     statusBarTop: Dp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
 ) {
-    val categories = remember { listOf("Trending", "New", "Movies", "Serials", "TV Shows", "YT Videos") }
+    val categories = remember { listOf("Latest Releases", "Trending", "YT Videos", "Movies", "Serials", "TV Shows") }
     val categoryScrollState = rememberScrollState()
 
     Column(
@@ -89,18 +103,36 @@ fun HomeHeroCategoryHeader(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Image(
-                painter = painterResource(Res.drawable.netmax_logo),
+                painter = painterResource(Res.drawable.app_icon_original),
                 contentDescription = "NetMax",
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(6.dp)),
                 contentScale = ContentScale.Fit,
             )
             Text(
-                text = "NetMax",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
+                text = buildAnnotatedString {
+                    withStyle(
+                        SpanStyle(
+                            color = Color.White,
+                            fontWeight = FontWeight.ExtraBold,
+                        ),
+                    ) {
+                        append("NET")
+                    }
+                    withStyle(
+                        SpanStyle(
+                            color = Color(0xFFE50914),
+                            fontWeight = FontWeight.ExtraBold,
+                        ),
+                    ) {
+                        append("MAX")
+                    }
+                },
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = 20.sp,
                     letterSpacing = 0.5.sp,
                 ),
-                color = Color.White,
             )
         }
 
@@ -154,7 +186,7 @@ fun HomeHeroCategoryHeader(
 fun HomeHeroPosterCarouselSection(
     items: List<MetaPreview>,
     modifier: Modifier = Modifier,
-    selectedCategory: String = "Trending",
+    selectedCategory: String = "Latest Releases",
     onCategorySelected: (String) -> Unit = {},
     viewportHeight: Dp? = null,
     listState: LazyListState? = null,
@@ -170,6 +202,12 @@ fun HomeHeroPosterCarouselSection(
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     // Auto-scroll effect
+    LaunchedEffect(selectedCategory) {
+        if (items.isNotEmpty()) {
+            pagerState.scrollToPage(0)
+        }
+    }
+
     LaunchedEffect(pagerState.currentPage, items.size) {
         if (items.size <= 1) return@LaunchedEffect
         delay(HERO_CAROUSEL_AUTO_SCROLL_DELAY_MS)
@@ -182,6 +220,74 @@ fun HomeHeroPosterCarouselSection(
             animationSpec = tween(durationMillis = 650, easing = FastOutSlowInEasing),
         )
     }
+
+    val activeIndex = pagerState.currentPage.coerceIn(items.indices)
+    val activeItem = items.getOrNull(activeIndex)
+
+    // Palette extraction caches per movie item
+    val posterBitmaps = remember { mutableStateMapOf<String, ImageBitmap>() }
+    val posterPainters = remember { mutableStateMapOf<String, Painter>() }
+
+    val dominantImageBitmapColorState = rememberDominantColorState(
+        defaultColor = primaryColor,
+        defaultOnColor = Color.White,
+    )
+    val dominantPainterColorState = rememberPainterDominantColorState(
+        defaultColor = primaryColor,
+        defaultOnColor = Color.White,
+    )
+
+    val activeKey = activeItem?.id
+    val activeBitmap = activeKey?.let { posterBitmaps[it] }
+    val activePainter = activeKey?.let { posterPainters[it] }
+
+    LaunchedEffect(activeKey, activeBitmap, activePainter) {
+        if (activeKey != null) {
+            when {
+                activeBitmap != null -> runCatching {
+                    dominantImageBitmapColorState.updateFrom(activeBitmap)
+                }
+                activePainter != null -> runCatching {
+                    dominantPainterColorState.updateFrom(activePainter)
+                }
+            }
+        }
+    }
+
+    // Derive subtle accent color from poster (or seed fallback)
+    val extractedRawColor = when {
+        activeBitmap != null -> dominantImageBitmapColorState.color
+        activePainter != null -> dominantPainterColorState.color
+        else -> deriveMovieArtworkSeedColor(activeItem, primaryColor)
+    }
+
+    // Blend accent with NetMax theme colors (never replace theme, always preserve dark UI aesthetic)
+    val targetCenterGlowColor = remember(extractedRawColor, primaryColor) {
+        primaryColor.blendTowards(extractedRawColor, fraction = 0.50f)
+    }
+    val targetSecondaryGlowColor = remember(extractedRawColor, backgroundColor) {
+        backgroundColor.blendTowards(extractedRawColor, fraction = 0.45f)
+    }
+    val targetTertiaryGlowColor = remember(extractedRawColor, backgroundColor) {
+        backgroundColor.blendTowards(extractedRawColor, fraction = 0.30f)
+    }
+
+    // Smooth, gradual transitions between movie palettes (no jumps or flashing)
+    val animatedCenterColor by animateColorAsState(
+        targetValue = targetCenterGlowColor,
+        animationSpec = tween(durationMillis = 800, easing = LinearOutSlowInEasing),
+        label = "hero_ambient_center_glow",
+    )
+    val animatedSecondaryColor by animateColorAsState(
+        targetValue = targetSecondaryGlowColor,
+        animationSpec = tween(durationMillis = 850, easing = LinearOutSlowInEasing),
+        label = "hero_ambient_secondary_glow",
+    )
+    val animatedTertiaryColor by animateColorAsState(
+        targetValue = targetTertiaryGlowColor,
+        animationSpec = tween(durationMillis = 900, easing = LinearOutSlowInEasing),
+        label = "hero_ambient_tertiary_glow",
+    )
 
     BoxWithConstraints(
         modifier = modifier
@@ -201,52 +307,81 @@ fun HomeHeroPosterCarouselSection(
         val horizontalPadding = if (isTablet) 32.dp else 20.dp
         val horizontalContentPadding = ((screenWidth - posterWidth) / 2).coerceAtLeast(16.dp)
 
-        // 4. SOFT-GRADIENT BACKGROUND: Dark cinematic background using NetMax theme colors
-        // Blurred atmospheric bloom behind the center poster
+        // 4. ADAPTIVE AMBIENT BACKGROUND GRADIENT
+        // Soft, cinematic atmospheric glow dynamically derived from the active movie poster,
+        // seamlessly blended into the NetMax dark theme palette.
         Box(
             modifier = Modifier
-                .align(Alignment.Center)
-                .size(posterWidth * 1.6f, posterHeight * 1.25f)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            primaryColor.copy(alpha = 0.24f),
-                            primaryColor.copy(alpha = 0.08f),
-                            Color.Transparent,
-                        ),
-                    ),
-                ),
-        )
+                .fillMaxSize()
+                .drawBehind {
+                    val canvasWidth = size.width
+                    val canvasHeight = size.height
+                    val maxDimension = maxOf(canvasWidth, canvasHeight)
 
-        // Vignette top & bottom to maintain high readability and dark edges
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(110.dp)
-                .align(Alignment.TopCenter)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.55f),
-                            Color.Transparent,
+                    // Base NetMax dark background
+                    drawRect(color = backgroundColor)
+
+                    // Center position behind the active hero poster
+                    val posterCenterY = (statusBarTop.toPx() + 50.dp.toPx() + posterHeight.toPx() * 0.5f)
+                        .coerceIn(canvasHeight * 0.30f, canvasHeight * 0.55f)
+
+                    // Region 1: Center ambient bloom behind active poster (slightly stronger atmospheric glow)
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            0.00f to animatedCenterColor.copy(alpha = 0.26f),
+                            0.25f to animatedCenterColor.copy(alpha = 0.16f),
+                            0.55f to animatedCenterColor.copy(alpha = 0.06f),
+                            1.00f to Color.Transparent,
+                            center = Offset(canvasWidth * 0.5f, posterCenterY),
+                            radius = maxDimension * 0.55f,
                         ),
-                    ),
-                ),
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(130.dp)
-                .align(Alignment.BottomCenter)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            backgroundColor.copy(alpha = 0.70f),
-                            backgroundColor,
+                    )
+
+                    // Region 2: Upper-left atmospheric bloom (soft screen reflection diffusion)
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            0.00f to animatedSecondaryColor.copy(alpha = 0.18f),
+                            0.35f to animatedSecondaryColor.copy(alpha = 0.08f),
+                            1.00f to Color.Transparent,
+                            center = Offset(canvasWidth * 0.22f, posterCenterY * 0.82f),
+                            radius = maxDimension * 0.65f,
                         ),
-                    ),
-                ),
+                    )
+
+                    // Region 3: Lower-right ambient depth region (soft fill diffusion)
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            0.00f to animatedTertiaryColor.copy(alpha = 0.15f),
+                            0.40f to animatedTertiaryColor.copy(alpha = 0.06f),
+                            1.00f to Color.Transparent,
+                            center = Offset(canvasWidth * 0.78f, posterCenterY * 1.15f),
+                            radius = maxDimension * 0.60f,
+                        ),
+                    )
+
+                    // Top vignette: preserves status bar and category tab contrast & readability
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            0.00f to Color.Black.copy(alpha = 0.55f),
+                            0.65f to Color.Black.copy(alpha = 0.20f),
+                            1.00f to Color.Transparent,
+                            startY = 0f,
+                            endY = (statusBarTop.toPx() + 100.dp.toPx()).coerceAtLeast(110.dp.toPx()),
+                        ),
+                    )
+
+                    // Bottom seamless fade: gently merges into the NetMax dark background
+                    val bottomVignetteHeight = 150.dp.toPx()
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            0.00f to Color.Transparent,
+                            0.45f to backgroundColor.copy(alpha = 0.60f),
+                            1.00f to backgroundColor,
+                            startY = canvasHeight - bottomVignetteHeight,
+                            endY = canvasHeight,
+                        ),
+                    )
+                },
         )
 
         Column(
@@ -308,6 +443,17 @@ fun HomeHeroPosterCarouselSection(
                             contentDescription = item.name,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
+                            onSuccess = { state ->
+                                val bmp = loadedBackdropImageBitmap(state.result)
+                                val pntr = state.painter
+                                val id = item.id
+                                if (bmp != null) {
+                                    posterBitmaps[id] = bmp
+                                }
+                                if (pntr != null) {
+                                    posterPainters[id] = pntr
+                                }
+                            },
                         )
                     }
                 }
@@ -316,7 +462,6 @@ fun HomeHeroPosterCarouselSection(
             Spacer(modifier = Modifier.height(14.dp))
 
             // 6. HERO MOVIE INFORMATION: Immediately below the active poster
-            val activeItem = items.getOrNull(pagerState.currentPage.coerceIn(items.indices))
             if (activeItem != null) {
                 Column(
                     modifier = Modifier
@@ -424,3 +569,36 @@ private fun extractHeroDuration(releaseInfo: String?): String? {
     val match = Regex("""(\d+\s*(?:h|hr|hrs|m|min|mins)\b.*)""", RegexOption.IGNORE_CASE).find(releaseInfo)
     return match?.value?.trim()
 }
+
+/**
+ * Blends this color towards the [target] color by the given [fraction].
+ */
+private fun Color.blendTowards(target: Color, fraction: Float): Color {
+    val clamped = fraction.coerceIn(0f, 1f)
+    return Color(
+        red = red + (target.red - red) * clamped,
+        green = green + (target.green - green) * clamped,
+        blue = blue + (target.blue - blue) * clamped,
+        alpha = alpha + (target.alpha - alpha) * clamped,
+    )
+}
+
+/**
+ * Derives a subtle cinematic seed color for the given [item] when image palette is not yet available.
+ */
+private fun deriveMovieArtworkSeedColor(item: MetaPreview?, fallback: Color): Color {
+    if (item == null) return fallback
+    val hash = (item.id.hashCode() * 31 + item.name.hashCode()).absoluteValue
+    val cinematicPalettes = listOf(
+        Color(0xFF8B1E1E), // Deep ruby
+        Color(0xFF1E3A5F), // Deep navy / teal
+        Color(0xFF2E1A47), // Deep violet
+        Color(0xFF6B3012), // Warm amber
+        Color(0xFF1F4A38), // Deep emerald
+        Color(0xFF7A2048), // Deep crimson
+        Color(0xFF3F2B63), // Royal plum
+        Color(0xFF2C3E50), // Steel midnight
+    )
+    return cinematicPalettes[hash % cinematicPalettes.size]
+}
+
