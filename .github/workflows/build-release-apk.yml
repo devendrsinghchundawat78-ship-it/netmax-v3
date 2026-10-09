@@ -1,9 +1,6 @@
 name: Build Android Release APK
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -32,43 +29,54 @@ jobs:
       - name: Guard Against Android SVG Drawables
         run: bash scripts/check-no-android-svg.sh
 
-      - name: Prepare Keystore and Build Configuration
+      - name: Generate NETMAX Launcher Resources
         run: |
-          echo "=== Generating Release Signing Keystore ==="
-          if [ -n "${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > release.jks
-            echo "Using keystore from secret"
-          else
-            keytool -genkey -v \
-              -keystore release.jks \
-              -alias netmax \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -storepass netmaxpassword \
-              -keypass netmaxpassword \
-              -dname "CN=NetMax Release, OU=NetMax, O=NetMax, L=Unknown, ST=Unknown, C=IN"
-            echo "Generated self-signed release keystore"
+          python3 -m pip install Pillow==11.3.0
+          python3 scripts/generate-netmax-icons.py
+
+      - name: Save Generated Launcher Resources
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add composeApp/src/androidMain/res/mipmap-* composeApp/src/commonMain/composeResources/drawable/app_icon_original.png
+          if ! git diff --cached --quiet; then
+            git commit -m "Generate NETMAX launcher icon resources at all densities"
+            git push origin HEAD:main
           fi
 
-          echo "=== Setting up local.properties ==="
-          if [ -n "${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}" ]; then
-            echo "${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}" | base64 --decode > local.properties
-            echo "NUVIO_RELEASE_STORE_FILE=release.jks" >> local.properties
+      - name: Prepare Persistent Release Signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.NUVIO_RELEASE_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.NUVIO_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.NUVIO_RELEASE_KEY_PASSWORD }}
+          LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing persistent signing secret: $name. Refusing to generate a new key."
+              exit 1
+            fi
+          done
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > release.jks
+          chmod 600 release.jks
+          if [ -n "$LOCAL_PROPERTIES_BASE64" ]; then
+            printf '%s' "$LOCAL_PROPERTIES_BASE64" | base64 --decode > local.properties
           else
-            cat << 'EOF' > local.properties
-          NUVIO_RELEASE_STORE_FILE=release.jks
-          NUVIO_RELEASE_STORE_PASSWORD=netmaxpassword
-          NUVIO_RELEASE_KEY_ALIAS=netmax
-          NUVIO_RELEASE_KEY_PASSWORD=netmaxpassword
-          TRAKT_CLIENT_ID=
-          TRAKT_CLIENT_SECRET=
-          TRAKT_REDIRECT_URI=nuvio://auth/trakt
-          SIMKL_CLIENT_ID=
-          SIMKL_REDIRECT_URI=nuvio://auth/simkl
-          SIMKL_APP_NAME=netmax
-          EOF
+            touch local.properties
           fi
+          python3 - <<'PYCONFIG'
+          import os
+          from pathlib import Path
+          p = Path('local.properties')
+          lines = [line for line in p.read_text().splitlines() if not line.startswith('NUVIO_RELEASE_')]
+          def escape(value):
+              return value.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r')
+          values = {'NUVIO_RELEASE_STORE_FILE': 'release.jks', 'NUVIO_RELEASE_STORE_PASSWORD': os.environ['STORE_PASSWORD'], 'NUVIO_RELEASE_KEY_ALIAS': os.environ['KEY_ALIAS'], 'NUVIO_RELEASE_KEY_PASSWORD': os.environ['KEY_PASSWORD']}
+          p.write_text('\n'.join(lines + [f'{key}={escape(value)}' for key, value in values.items()]) + '\n')
+          PYCONFIG
+          keytool -list -keystore release.jks -storepass:env STORE_PASSWORD -alias "$KEY_ALIAS"
 
       - name: Build Android Full Release APK
         run: |
@@ -113,15 +121,5 @@ jobs:
           gh release create "$TAG_NAME" \
             release-output/NetMax-v*-release.apk \
             --title "$RELEASE_TITLE" \
-            --notes "### NetMax v${VERSION} Android Release Build
-          
-          **Version:** ${VERSION}
-          **Build Number:** ${{ github.run_number }}
-          **Commit:** ${{ github.sha }}
-          
-          #### What's New:
-          - ✨ **Liquid Glass (Beta)**: Real-time glass blur, specular refraction rim, and fluid design.
-          - 🎬 **Bollywood & Indian Series**: Dedicated home catalog sections.
-          - 🍿 **Universal Scrapers**: NetMax multi-CDN automatic provider support.
-          - 🚀 **Performance**: 60/120fps smooth scrolling with 0 lag or freeze." \
-            --generate-notes=false || true
+            --notes "NETMAX v${VERSION}. New Ribbon N + play-slab launcher icon. Persistent release signing required for all future builds. If your installed APK used a different certificate, this transition needs one uninstall/reinstall; back up your settings first. Future APKs signed with the same key and a higher versionCode can update in place." \
+            --generate-notes=false
