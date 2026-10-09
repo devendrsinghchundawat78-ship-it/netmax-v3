@@ -1,55 +1,36 @@
 <div align="center">
 
-  <img src="https://nuvio.tv/assets/nuvio-app-logo-wordmark.webp" alt="Nuvio" width="320" />
+# NETMAX
 
-  <p>
-    A free, open-source media app for your phone, your desktop, and the TV you already own.
-    <br />
-    Bring your own sources. Nuvio turns them into a library with artwork, ratings, subtitles, and your place saved on every screen.
-  </p>
+**Discover movies, series and anime. Keep a watchlist. Know what to watch next.**
 
-  [Website](https://nuvio.tv) · [GitHub releases](https://github.com/NuvioMedia/NuvioMobile/releases/latest) · [Support Nuvio](https://nuvio.tv/support)
+A free Android app that brings trending titles, search, ratings and your personal watchlist into one clean, dark, premium interface.
+
+[**Download APK**](https://github.com/devendrsinghchundawat78-ship-it/netmax-v3/releases/download/v3.1.2-30/NetMax-v3.1.2-release.apk) · [All releases](https://github.com/devendrsinghchundawat78-ship-it/netmax-v3/releases)
 
 </div>
 
-## Get Nuvio Mobile
+## About NETMAX
 
-- [Android on Google Play](https://play.google.com/store/apps/details?id=com.nuvio.app)
-- [Android APK](https://github.com/NuvioMedia/NuvioMobile/releases/latest)
-- iOS must be built from source.
+NETMAX is built for people who never know what to watch next. Browse what is trending in movies, series and anime, search any title, see artwork and ratings, and save the ones you care about to your watchlist so your place is always remembered.
 
-## Build from source
+- **Discover** - trending and popular movies, series and anime in one place
+- **Search** - find any title fast
+- **Watchlist** - save titles and come back to them anytime
+- **Clean design** - dark, modern interface made for phones
 
-```bash
-git clone https://github.com/NuvioMedia/NuvioMobile.git
-cd NuvioMobile
-```
+NETMAX is a discovery and watchlist app. It does not host or sell any media.
 
-### Android
+## Download
 
-Android development requires Android Studio and the Android SDK.
+1. Open the [latest release](https://github.com/devendrsinghchundawat78-ship-it/netmax-v3/releases/download/v3.1.2-30/NetMax-v3.1.2-release.apk) on your Android phone. The APK downloads with one tap.
+2. Open the downloaded file and allow install from this source if Android asks.
+3. Launch NETMAX.
 
-```bash
-./gradlew :androidApp:assembleFullDebug
-```
+Requires Android.
 
-### iOS
+## License and attribution
 
-iOS development requires macOS and Xcode.
+NETMAX is based on the open-source project **Nuvio** by NuvioMedia ([NuvioMobile](https://github.com/NuvioMedia/NuvioMobile), [nuvio.tv](https://nuvio.tv)). Full credit to the Nuvio authors for the original work.
 
-```bash
-env NUVIO_IOS_DISTRIBUTION=full xcodebuild \
-  -project iosApp/iosApp.xcodeproj \
-  -scheme iosApp \
-  -configuration Debug \
-  -sdk iphonesimulator \
-  -derivedDataPath build/ios-derived-full-simulator \
-  CODE_SIGNING_ALLOWED=NO \
-  build
-```
-
-The shared app is built with Kotlin Multiplatform and Compose Multiplatform.
-
-## License
-
-[GNU General Public License v3.0](./LICENSE)
+This project is distributed under the [GNU General Public License v3.0](./LICENSE), the same license as the original, and the license and copyright notices are retained.
